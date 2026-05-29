@@ -1,0 +1,1086 @@
+{
+  "name": "Chapter2_AutoResearch_Workflow improve plus plus 人机交互版 +提示词修改",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "AI驱动蛋白质设计研究方向发现案例",
+        "formDescription": "请输入一个蛋白质设计相关科研问题，系统将自动检索相关文献，并生成研究方向建议。",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "research_question",
+              "fieldType": "textarea",
+              "placeholder": "AI如何辅助靶向治疗蛋白质结构设计与功能优化？",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "domain",
+              "placeholder": "protein design, protein engineering, generative AI, diffusion model, protein language model"
+            },
+            {
+              "fieldLabel": " max_papers",
+              "placeholder": "10"
+            },
+            {
+              "fieldLabel": "output_language",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "中文"
+                  },
+                  {
+                    "option": "English"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -3392,
+        176
+      ],
+      "id": "c7cd430f-c36f-46d4-add8-722cae4055d0",
+      "name": "表单提交触发",
+      "webhookId": "4160755b-42d3-41f2-ba83-9838b7885da3"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9e109b3a-bbe5-4f38-ac03-9e2b0324c896",
+              "name": "question",
+              "value": "={{$json.research_question}}",
+              "type": "string"
+            },
+            {
+              "id": "428a2871-16ea-4834-9860-07e01f528fbd",
+              "name": "domain",
+              "value": "={{$json.domain}}",
+              "type": "string"
+            },
+            {
+              "id": "52f09686-8a32-45a2-b19c-641c86e3c6d7",
+              "name": "max_papers",
+              "value": "={{$json.max_papers || 10}}",
+              "type": "string"
+            },
+            {
+              "id": "1c1b2f29-ab15-4969-8e00-574eadd5b5e4",
+              "name": "output_language",
+              "value": "={{$json.output_language || \"中文\"}}",
+              "type": "string"
+            },
+            {
+              "id": "a6949940-3916-4797-894a-bb0c161361e7",
+              "name": "task_name",
+              "value": "AI驱动蛋白质设计研究方向发现",
+              "type": "string"
+            },
+            {
+              "id": "9a09a03c-9208-461b-b6c9-d4430c72a103",
+              "name": "year_from",
+              "value": "2020",
+              "type": "string"
+            },
+            {
+              "id": "00d8429e-f969-45b9-9a3f-3792e931c1c1",
+              "name": "",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "001f4e89-4dfb-4f42-9ae1-21729aa2f6fd",
+              "name": "year_to",
+              "value": "2026",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -3168,
+        176
+      ],
+      "id": "aba572e9-1116-470e-abe8-a50e1e751be9",
+      "name": "标准化用户输入"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=你是一名自动化科研系统中的“科学文献检索规划智能体”。\n\n当前任务：\n{{$json.task_name}}\n\n用户研究问题：\n{{$json.question}}\n\n研究领域：\n{{$json.domain}}\n\n本工作流的目标是：\n将用户输入的科研问题转化为适合学术数据库检索的英文检索式，用于后续“科学文献自动理解”流程。\n\n重要定位：\n1. 本节点只负责生成文献检索式；\n2. 不负责生成研究方向；\n3. 不负责提出科学假设；\n4. 不负责判断研究空白；\n5. 检索式应服务于后续的文献检索、筛选、证据卡片生成和文献理解报告。\n\n请根据用户问题，生成适合用于 OpenAlex 和 arXiv 的英文检索关键词组合。\n\n检索策略要求：\n1. recommended_query 不要过窄；\n2. 不要只聚焦 PROTAC、ADC、kinase inhibitor 或某一个具体子领域；\n3. 检索式应覆盖“AI辅助蛋白质结构设计与功能优化”的主要相关方向；\n4. 应覆盖以下概念中的多个：\n   - AI-driven protein design\n   - protein structure design\n   - therapeutic protein design\n   - antibody design\n   - nanobody optimization\n   - protein engineering\n   - protein language model\n   - generative AI\n   - diffusion model\n   - structure prediction\n   - binding affinity optimization\n   - protein-protein interaction\n   - targeted therapy\n5. 检索式要适合直接用于 OpenAlex 的 search 参数和 arXiv 的 all: 检索；\n6. 每个检索式不要过长，避免复杂布尔表达式；\n7. 不要使用中文；\n8. 不要输出解释；\n9. 只输出 JSON。\n\n输出格式必须严格如下：\n\n{\n  \"queries\": [\n    \"AI protein design therapeutic protein structure optimization\",\n    \"generative AI protein engineering antibody nanobody design\",\n    \"protein language model protein structure prediction function optimization\",\n    \"diffusion model protein design binding affinity optimization\",\n    \"AI assisted therapeutic protein design targeted therapy\"\n  ],\n  \"recommended_query\": \"AI protein design therapeutic protein structure optimization\"\n}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -2944,
+        176
+      ],
+      "id": "b5f360d5-84f5-4713-994a-648bfe14dff7",
+      "name": "生成检索式链"
+    },
+    {
+      "parameters": {
+        "model": "deepseek-v4-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        -2880,
+        400
+      ],
+      "id": "167ae87b-a586-47fd-8215-1f2bdaccba75",
+      "name": "生成检索式模型",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "XuwbxL3z8Hy7psm9",
+          "name": "DeepSeek account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\n// 尽可能兼容不同 AI 节点的输出格式\nlet raw =\n  input.output ||\n  input.text ||\n  input.response ||\n  input.message ||\n  input.content ||\n  input.choices?.[0]?.message?.content ||\n  '';\n\n// 如果 message 是对象，尝试取 content\nif (typeof raw === 'object' && raw.content) {\n  raw = raw.content;\n}\n\n// 如果仍然不是字符串，转成字符串\nif (typeof raw !== 'string') {\n  raw = JSON.stringify(raw);\n}\n\n// 去掉可能出现的 markdown 代码块\nraw = raw\n  .replace(/```json/g, '')\n  .replace(/```/g, '')\n  .trim();\n\nlet parsed;\n\ntry {\n  parsed = JSON.parse(raw);\n} catch (error) {\n  // 如果模型没有严格输出 JSON，就退化为普通关键词\n  parsed = {\n    queries: [raw],\n    recommended_query: raw\n  };\n}\n\nconst queries = parsed.queries || [];\nconst recommendedQuery = parsed.recommended_query || queries[0] || 'AI protein design';\n\nreturn [\n  {\n    json: {\n      query: recommendedQuery,\n      all_queries: queries,\n      question: $('标准化用户输入').first().json.question,\n      domain: $('标准化用户输入').first().json.domain,\n      max_papers: $('标准化用户输入').first().json.max_papers,\n      output_language: $('标准化用户输入').first().json.output_language,\n      task_name: $('标准化用户输入').first().json.task_name,\n      year_from: $('标准化用户输入').first().json.year_from,\n      year_to: $('标准化用户输入').first().json.year_to\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2592,
+        176
+      ],
+      "id": "c78c3df8-9a45-47b0-910c-a1f8f7a7506e",
+      "name": "解析检索式"
+    },
+    {
+      "parameters": {
+        "url": "https://api.openalex.org/works",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "search",
+              "value": "={{$json.query}}"
+            },
+            {
+              "name": "per-page",
+              "value": "={{$json.max_papers}}"
+            },
+            {
+              "name": "filter",
+              "value": "=from_publication_date:{{$json.year_from}}-01-01,to_publication_date:{{$json.year_to}}-12-31"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2144,
+        80
+      ],
+      "id": "ba5b3ef0-2c61-4273-b7d2-734ad47b5f60",
+      "name": "检索文献-OpenAlex"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n const response = $input.first().json;\nconst works = response.results || [];\n\nconst context = $('解析检索式').first().json;\n\n// OpenAlex 的 abstract 通常是 abstract_inverted_index，需要还原成普通文本\nfunction reconstructAbstract(invertedIndex) {\n  if (!invertedIndex || typeof invertedIndex !== 'object') {\n    return '';\n  }\n\n  const words = [];\n\n  for (const [word, positions] of Object.entries(invertedIndex)) {\n    if (Array.isArray(positions)) {\n      for (const pos of positions) {\n        words.push([pos, word]);\n      }\n    }\n  }\n\n  return words\n    .sort((a, b) => a[0] - b[0])\n    .map(item => item[1])\n    .join(' ');\n}\n\nreturn works.map((work, index) => {\n  const authors = (work.authorships || [])\n    .map(a => a.author?.display_name)\n    .filter(Boolean)\n    .join(', ');\n\n  const venue =\n    work.primary_location?.source?.display_name ||\n    work.host_venue?.display_name ||\n    '';\n\n  const url =\n    work.doi ||\n    work.primary_location?.landing_page_url ||\n    work.id ||\n    '';\n\n  const concepts = (work.concepts || [])\n    .slice(0, 5)\n    .map(c => c.display_name)\n    .filter(Boolean)\n    .join(', ');\n\n  const openalexId = (work.id || '').replace('https://openalex.org/', '');\n\n  return {\n    json: {\n      rank: index + 1,\n      paper_id: work.id || '',\n      openalex_id: openalexId,\n      title: work.display_name || '',\n      abstract: reconstructAbstract(work.abstract_inverted_index),\n      year: work.publication_year || '',\n      publication_date: work.publication_date || '',\n      authors,\n      venue,\n      citation_count: work.cited_by_count || 0,\n      doi: work.doi || '',\n      url,\n      concepts,\n\n      // 新增：用于引文溯源和雪球法\n      referenced_works: work.referenced_works || [],\n      cited_by_api_url: work.cited_by_api_url || '',\n      related_works: work.related_works || [],\n\n      // 新增：记录文献来源\n      source_database: 'OpenAlex',\n      source_type: 'initial_search',\n      parent_seed_title: '',\n      parent_seed_id: '',\n\n      // 保留上游任务信息，方便后续 AI 分析\n      query: context.query,\n      question: context.question,\n      domain: context.domain,\n      max_papers: context.max_papers,\n      output_language: context.output_language,\n      task_name: context.task_name,\n      year_from: context.year_from,\n      year_to: context.year_to\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1920,
+        80
+      ],
+      "id": "56e34cab-b4ae-4c71-a98d-84c7b8de2a7a",
+      "name": "标准化文献-OpenAlex"
+    },
+    {
+      "parameters": {
+        "url": "https://export.arxiv.org/api/query",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "search_query",
+              "value": "={{\"all:\" + $json.query}}"
+            },
+            {
+              "name": "start",
+              "value": "0"
+            },
+            {
+              "name": "max_results",
+              "value": "={{$json.max_papers}}"
+            },
+            {
+              "name": "sortBy",
+              "value": "submittedDate"
+            },
+            {
+              "name": "sortOrder",
+              "value": "descending"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2368,
+        272
+      ],
+      "id": "b8f3417b-4802-43dc-9c77-4098bda8b48c",
+      "name": "检索文献-arXiv",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [
+        -2144,
+        272
+      ],
+      "id": "4318aaea-b1b6-4e90-88ba-50f31e7f2d24",
+      "name": "转换arXiv XML为JSON"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\n// 兼容 n8n XML 节点的不同输出结构\nconst feed = input.feed || input.data?.feed || input;\nlet entries = feed.entry || [];\n\nif (!entries) {\n  return [];\n}\n\nif (!Array.isArray(entries)) {\n  entries = [entries];\n}\n\nconst context = $('解析检索式').first().json;\n\nfunction getText(value) {\n  if (!value) return '';\n  if (typeof value === 'string') return value;\n  if (value._) return value._;\n  if (value['#text']) return value['#text'];\n  return String(value);\n}\n\nfunction getAuthors(authorField) {\n  if (!authorField) return '';\n  const authors = Array.isArray(authorField) ? authorField : [authorField];\n  return authors.map(a => getText(a.name)).filter(Boolean).join(', ');\n}\n\nfunction getYear(published) {\n  const text = getText(published);\n  return text ? text.slice(0, 4) : '';\n}\n\nfunction getPdfUrl(entry) {\n  const links = Array.isArray(entry.link) ? entry.link : [entry.link].filter(Boolean);\n  const pdf = links.find(l => l.$?.title === 'pdf' || l.$?.type === 'application/pdf');\n  return pdf?.$?.href || getText(entry.id);\n}\n\nfunction getArxivId(entry) {\n  const id = getText(entry.id);\n  return id\n    .replace('http://arxiv.org/abs/', '')\n    .replace('https://arxiv.org/abs/', '');\n}\n\nreturn entries.map((entry, index) => ({\n  json: {\n    rank: index + 1,\n    paper_id: getText(entry.id),\n    openalex_id: '',\n    arxiv_id: getArxivId(entry),\n    title: getText(entry.title).replace(/\\s+/g, ' ').trim(),\n    abstract: getText(entry.summary).replace(/\\s+/g, ' ').trim(),\n    year: getYear(entry.published),\n    publication_date: getText(entry.published),\n    authors: getAuthors(entry.author),\n    venue: 'arXiv',\n    citation_count: 0,\n    doi: '',\n    url: getPdfUrl(entry),\n    concepts: 'arXiv preprint',\n\n    // arXiv 没有 OpenAlex 引文网络字段，先置空\n    referenced_works: [],\n    cited_by_api_url: '',\n    related_works: [],\n\n    // 标记来源\n    source_database: 'arXiv',\n    source_type: 'arxiv_search',\n    parent_seed_title: '',\n    parent_seed_id: '',\n\n    // 保留上游任务信息\n    query: context.query,\n    question: context.question,\n    domain: context.domain,\n    max_papers: context.max_papers,\n    output_language: context.output_language,\n    task_name: context.task_name,\n    year_from: context.year_from,\n    year_to: context.year_to\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1920,
+        272
+      ],
+      "id": "db8249c3-c93d-40f8-9bd2-fa23b71b7965",
+      "name": "标准化文献-arXiv"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -1696,
+        176
+      ],
+      "id": "77c32043-a4fb-4eab-87cc-1cd065ad3451",
+      "name": "合并文献-OpenAlex与arXiv"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(item => item.json);\n\nconst seen = new Set();\nconst output = [];\n\nfunction normalizeTitle(title) {\n  return String(title || '')\n    .toLowerCase()\n    .replace(/<[^>]*>/g, '')\n    .replace(/[^\\p{L}\\p{N}\\s]/gu, '')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nfunction normalizeDoi(doi) {\n  return String(doi || '')\n    .toLowerCase()\n    .replace('https://doi.org/', '')\n    .replace('http://doi.org/', '')\n    .trim();\n}\n\nfor (const paper of items) {\n  const doiKey = normalizeDoi(paper.doi);\n  const titleKey = normalizeTitle(paper.title);\n  const arxivKey = String(paper.arxiv_id || '').toLowerCase().trim();\n  const openalexKey = String(paper.openalex_id || '').toLowerCase().trim();\n  const paperKey = String(paper.paper_id || '').toLowerCase().trim();\n\n  const keys = [\n    doiKey ? `doi:${doiKey}` : '',\n    titleKey ? `title:${titleKey}` : '',\n    arxivKey ? `arxiv:${arxivKey}` : '',\n    openalexKey ? `openalex:${openalexKey}` : '',\n    paperKey ? `paper:${paperKey}` : ''\n  ].filter(Boolean);\n\n  if (keys.length === 0) continue;\n\n  const isDuplicate = keys.some(k => seen.has(k));\n\n  if (!isDuplicate) {\n    keys.forEach(k => seen.add(k));\n    output.push({\n      json: {\n        ...paper,\n        dedup_key: keys[0],\n        normalized_title: titleKey\n      }\n    });\n  }\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1472,
+        176
+      ],
+      "id": "0786d88b-bded-4376-a386-f026efc9adb2",
+      "name": "去重文献-多源检索"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=你是一名自动化科研系统中的“文献筛选智能体”。\n\n当前任务：\n{{$json.task_name}}\n\n用户研究问题：\n{{$json.question}}\n\n研究领域：\n{{$json.domain}}\n\n现在需要判断下面这篇论文是否适合进入“精选文献库”。\n\n论文信息：\n标题：{{$json.title}}\n作者：{{$json.authors}}\n年份：{{$json.year}}\n期刊/会议：{{$json.venue}}\n引用量：{{$json.citation_count}}\n关键词/概念：{{$json.concepts}}\n摘要：{{$json.abstract}}\n\n筛选标准：\n1. 是否与 AI 驱动的蛋白质设计、蛋白质工程、蛋白质功能优化相关；\n2. 是否涉及生成式 AI、扩散模型、蛋白质语言模型、深度学习、结构预测、序列设计等方法；\n3. 是否能够为后续文献理解、证据卡片生成和综述构建提供有效信息；；\n4. 摘要信息是否足够完整；\n5. 优先考虑近五年文献，但经典高引用文献也可以保留。\n\n请只输出 JSON，不要输出解释性文字。\n\n输出格式：\n{\n  \"title\": \"论文标题\",\n  \"decision\": \"include 或 exclude\",\n  \"score\": 0到100之间的整数,\n  \"reason\": \"筛选理由\",\n  \"evidence_type\": \"method / model / dataset / benchmark / review / application / theory / other\",\n  \"relation_to_question\": \"说明这篇论文与用户研究问题的关系\"\n}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -1248,
+        176
+      ],
+      "id": "2c9ca6bc-ec1f-4471-b260-d921584ae79b",
+      "name": "初筛文献链"
+    },
+    {
+      "parameters": {
+        "jsCode": "const screeningItems = $input.all();\nconst paperItems = $('去重文献-多源检索').all();\n\nfunction getRawOutput(json) {\n  let raw =\n    json.output ||\n    json.text ||\n    json.response ||\n    json.message ||\n    json.content ||\n    json.result ||\n    json.choices?.[0]?.message?.content ||\n    '';\n\n  if (typeof raw === 'object' && raw.content) {\n    raw = raw.content;\n  }\n\n  if (typeof raw !== 'string') {\n    raw = JSON.stringify(raw);\n  }\n\n  return raw.trim();\n}\n\nfunction cleanJsonText(raw) {\n  return raw\n    .replace(/```json/g, '')\n    .replace(/```/g, '')\n    .trim();\n}\n\nfunction extractJson(raw) {\n  const cleaned = cleanJsonText(raw);\n\n  try {\n    return JSON.parse(cleaned);\n  } catch (e) {\n    const start = cleaned.indexOf('{');\n    const end = cleaned.lastIndexOf('}');\n    if (start !== -1 && end !== -1 && end > start) {\n      const possibleJson = cleaned.slice(start, end + 1);\n      try {\n        return JSON.parse(possibleJson);\n      } catch (e2) {\n        return null;\n      }\n    }\n    return null;\n  }\n}\n\nreturn screeningItems.map((item, index) => {\n  const raw = getRawOutput(item.json);\n  const parsed = extractJson(raw);\n\n  const originalPaper = paperItems[index]?.json || {};\n\n  let decision = parsed?.decision || 'exclude';\n  decision = String(decision).toLowerCase().trim();\n\n  if (!['include', 'exclude'].includes(decision)) {\n    decision = decision.includes('include') || decision.includes('保留') ? 'include' : 'exclude';\n  }\n\n  let score = Number(parsed?.score ?? 0);\n  if (Number.isNaN(score)) {\n    score = 0;\n  }\n\n  return {\n    json: {\n      ...originalPaper,\n\n      screen_decision: decision,\n      screen_score: score,\n      screen_reason: parsed?.reason || '',\n      evidence_type: parsed?.evidence_type || '',\n      relation_to_question: parsed?.relation_to_question || '',\n      screening_raw_output: raw\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        176
+      ],
+      "id": "478dab71-54ef-4e64-b05a-652f4e483502",
+      "name": "解析初筛结果"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d95e827e-a3e1-4c7e-9cd9-f6920c8be499",
+              "leftValue": "={{$json.screen_decision}}",
+              "rightValue": "include",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -672,
+        176
+      ],
+      "id": "7a2facf1-f5ee-482f-90d5-bb28b5ff6f22",
+      "name": "保留初筛通过文献"
+    },
+    {
+      "parameters": {
+        "jsCode": "const papers = $('解析初筛结果').all().map(item => item.json);\n\nfunction cleanOpenAlexId(value) {\n  return String(value || '')\n    .replace('https://openalex.org/', '')\n    .trim();\n}\n\nconst seeds = papers\n  .map(paper => ({\n    ...paper,\n    openalex_id: cleanOpenAlexId(paper.openalex_id || paper.paper_id)\n  }))\n  .filter(paper => {\n    const score = Number(paper.screen_score || 0);\n    return paper.openalex_id && paper.openalex_id.startsWith('W') && score >= 60;\n  })\n  .sort((a, b) => Number(b.screen_score || 0) - Number(a.screen_score || 0))\n  .slice(0, 3);\n\nreturn seeds.map(seed => ({ json: seed }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        96
+      ],
+      "id": "b134c6a9-ff53-45ee-9b0e-3cad5f6b6437",
+      "name": "准备引文扩展种子文献"
+    },
+    {
+      "parameters": {
+        "url": "https://api.openalex.org/works",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "filter",
+              "value": "={{ \"cites:\" + $json.openalex_id }}"
+            },
+            {
+              "name": "per-page",
+              "value": "5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "11502d90-9909-46f8-a5a9-f0a40a17aaa4",
+      "name": "获取引用本文献-前向雪球"
+    },
+    {
+      "parameters": {
+        "jsCode": "const responseItems = $input.all();\nconst seedItems = $('准备引文扩展种子文献').all();\n\nfunction reconstructAbstract(invertedIndex) {\n  if (!invertedIndex || typeof invertedIndex !== 'object') {\n    return '';\n  }\n\n  const words = [];\n\n  for (const [word, positions] of Object.entries(invertedIndex)) {\n    if (Array.isArray(positions)) {\n      for (const pos of positions) {\n        words.push([pos, word]);\n      }\n    }\n  }\n\n  return words\n    .sort((a, b) => a[0] - b[0])\n    .map(item => item[1])\n    .join(' ');\n}\n\nconst output = [];\n\nfor (let i = 0; i < responseItems.length; i++) {\n  const response = responseItems[i].json;\n  const seed = seedItems[i]?.json || {};\n\n  const works = response.results || [];\n\n  for (let j = 0; j < works.length; j++) {\n    const work = works[j];\n\n    const authors = (work.authorships || [])\n      .map(a => a.author?.display_name)\n      .filter(Boolean)\n      .join(', ');\n\n    const venue =\n      work.primary_location?.source?.display_name ||\n      work.host_venue?.display_name ||\n      '';\n\n    const url =\n      work.doi ||\n      work.primary_location?.landing_page_url ||\n      work.id ||\n      '';\n\n    const concepts = (work.concepts || [])\n      .slice(0, 5)\n      .map(c => c.display_name)\n      .filter(Boolean)\n      .join(', ');\n\n    const openalexId = (work.id || '').replace('https://openalex.org/', '');\n\n    output.push({\n      json: {\n        rank: j + 1,\n        paper_id: work.id || '',\n        openalex_id: openalexId,\n        title: work.display_name || '',\n        abstract: reconstructAbstract(work.abstract_inverted_index),\n        year: work.publication_year || '',\n        publication_date: work.publication_date || '',\n        authors,\n        venue,\n        citation_count: work.cited_by_count || 0,\n        doi: work.doi || '',\n        url,\n        concepts,\n\n        // 引文网络字段\n        referenced_works: work.referenced_works || [],\n        cited_by_api_url: work.cited_by_api_url || '',\n        related_works: work.related_works || [],\n\n        // 标记来源：前向雪球法\n        source_database: 'OpenAlex',\n        source_type: 'forward_snowball',\n        parent_seed_title: seed.title || '',\n        parent_seed_id: seed.openalex_id || '',\n\n        // 保留任务上下文\n        query: seed.query || '',\n        question: seed.question || '',\n        domain: seed.domain || '',\n        max_papers: seed.max_papers || 10,\n        output_language: seed.output_language || '中文',\n        task_name: seed.task_name || '',\n        year_from: seed.year_from || '',\n        year_to: seed.year_to || ''\n      }\n    });\n  }\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "d73f5360-82eb-4f44-83b9-8dc14f563737",
+      "name": "标准化引用文献-前向雪球"
+    },
+    {
+      "parameters": {
+        "jsCode": "const seedItems = $input.all();\n\nconst output = [];\nconst seen = new Set();\n\n// 每篇种子文献最多取前 5 篇参考文献，避免扩展过多\nconst maxRefsPerSeed = 5;\n\nfunction cleanOpenAlexId(value) {\n  return String(value || '')\n    .replace('https://openalex.org/', '')\n    .trim();\n}\n\nfor (const item of seedItems) {\n  const seed = item.json;\n\n  const refs = Array.isArray(seed.referenced_works)\n    ? seed.referenced_works\n    : [];\n\n  const selectedRefs = refs.slice(0, maxRefsPerSeed);\n\n  for (const refUrl of selectedRefs) {\n    const refId = cleanOpenAlexId(refUrl);\n\n    if (!refId || !refId.startsWith('W')) {\n      continue;\n    }\n\n    const uniqueKey = `${seed.openalex_id || seed.paper_id || seed.title}__${refId}`;\n\n    if (seen.has(uniqueKey)) {\n      continue;\n    }\n\n    seen.add(uniqueKey);\n\n    output.push({\n      json: {\n        ref_id: refId,\n\n        // 记录它是由哪篇种子文献引出的\n        parent_seed_title: seed.title || '',\n        parent_seed_id: seed.openalex_id || '',\n\n        // 标记来源：引文溯源法\n        source_database: 'OpenAlex',\n        source_type: 'backward_snowball',\n\n        // 保留任务上下文\n        query: seed.query || '',\n        question: seed.question || '',\n        domain: seed.domain || '',\n        max_papers: seed.max_papers || 10,\n        output_language: seed.output_language || '中文',\n        task_name: seed.task_name || '',\n        year_from: seed.year_from || '',\n        year_to: seed.year_to || ''\n      }\n    });\n  }\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        192
+      ],
+      "id": "dda19c32-df1f-43c0-8448-455c2527d601",
+      "name": "准备参考文献ID-引文溯源"
+    },
+    {
+      "parameters": {
+        "url": "={{\"https://api.openalex.org/works/\" + $json.ref_id}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        192
+      ],
+      "id": "a8b2c232-0505-417a-80ec-b807a272c779",
+      "name": "获取参考文献-引文溯源",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const responseItems = $input.all();\nconst refItems = $('准备参考文献ID-引文溯源').all();\n\nfunction reconstructAbstract(invertedIndex) {\n  if (!invertedIndex || typeof invertedIndex !== 'object') {\n    return '';\n  }\n\n  const words = [];\n\n  for (const [word, positions] of Object.entries(invertedIndex)) {\n    if (Array.isArray(positions)) {\n      for (const pos of positions) {\n        words.push([pos, word]);\n      }\n    }\n  }\n\n  return words\n    .sort((a, b) => a[0] - b[0])\n    .map(item => item[1])\n    .join(' ');\n}\n\nconst output = [];\n\nfor (let i = 0; i < responseItems.length; i++) {\n  const work = responseItems[i].json;\n  const refMeta = refItems[i]?.json || {};\n\n  if (!work || !work.id) {\n    continue;\n  }\n\n  const authors = (work.authorships || [])\n    .map(a => a.author?.display_name)\n    .filter(Boolean)\n    .join(', ');\n\n  const venue =\n    work.primary_location?.source?.display_name ||\n    work.host_venue?.display_name ||\n    '';\n\n  const url =\n    work.doi ||\n    work.primary_location?.landing_page_url ||\n    work.id ||\n    '';\n\n  const concepts = (work.concepts || [])\n    .slice(0, 5)\n    .map(c => c.display_name)\n    .filter(Boolean)\n    .join(', ');\n\n  const openalexId = String(work.id || '').replace('https://openalex.org/', '');\n\n  output.push({\n    json: {\n      rank: i + 1,\n      paper_id: work.id || '',\n      openalex_id: openalexId,\n      arxiv_id: '',\n      title: work.display_name || '',\n      abstract: reconstructAbstract(work.abstract_inverted_index),\n      year: work.publication_year || '',\n      publication_date: work.publication_date || '',\n      authors,\n      venue,\n      citation_count: work.cited_by_count || 0,\n      doi: work.doi || '',\n      url,\n      concepts,\n\n      // 引文网络字段\n      referenced_works: work.referenced_works || [],\n      cited_by_api_url: work.cited_by_api_url || '',\n      related_works: work.related_works || [],\n\n      // 标记来源：引文溯源法\n      source_database: 'OpenAlex',\n      source_type: 'backward_snowball',\n\n      // 记录它是由哪篇种子文献追溯出来的\n      parent_seed_title: refMeta.parent_seed_title || '',\n      parent_seed_id: refMeta.parent_seed_id || '',\n\n      // 保留任务上下文\n      query: refMeta.query || '',\n      question: refMeta.question || '',\n      domain: refMeta.domain || '',\n      max_papers: refMeta.max_papers || 10,\n      output_language: refMeta.output_language || '中文',\n      task_name: refMeta.task_name || '',\n      year_from: refMeta.year_from || '',\n      year_to: refMeta.year_to || ''\n    }\n  });\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        192
+      ],
+      "id": "c45473e3-1530-4a5e-85a6-f8b4cda994ef",
+      "name": "标准化参考文献-引文溯源"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        448,
+        176
+      ],
+      "id": "6ac7d6cb-2f8f-4b0c-bcac-69d077cdb9f4",
+      "name": "合并扩展文献"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(item => item.json);\n\nconst seen = new Set();\nconst output = [];\n\nfunction normalizeTitle(title) {\n  return String(title || '')\n    .toLowerCase()\n    .replace(/<[^>]*>/g, '')\n    .replace(/[^\\p{L}\\p{N}\\s]/gu, '')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nfunction normalizeDoi(doi) {\n  return String(doi || '')\n    .toLowerCase()\n    .replace('https://doi.org/', '')\n    .replace('http://doi.org/', '')\n    .trim();\n}\n\nfor (const paper of items) {\n  const doiKey = normalizeDoi(paper.doi);\n  const titleKey = normalizeTitle(paper.title);\n  const arxivKey = String(paper.arxiv_id || '').toLowerCase().trim();\n  const openalexKey = String(paper.openalex_id || '').toLowerCase().trim();\n  const paperKey = String(paper.paper_id || '').toLowerCase().trim();\n\n  const keys = [\n    doiKey ? `doi:${doiKey}` : '',\n    titleKey ? `title:${titleKey}` : '',\n    arxivKey ? `arxiv:${arxivKey}` : '',\n    openalexKey ? `openalex:${openalexKey}` : '',\n    paperKey ? `paper:${paperKey}` : ''\n  ].filter(Boolean);\n\n  if (keys.length === 0) continue;\n\n  const isDuplicate = keys.some(k => seen.has(k));\n\n  if (!isDuplicate) {\n    keys.forEach(k => seen.add(k));\n    output.push({\n      json: {\n        ...paper,\n        dedup_key: keys[0],\n        normalized_title: titleKey\n      }\n    });\n  }\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        192
+      ],
+      "id": "3a23d839-b939-4803-a0bd-abd3f171babf",
+      "name": "去重文献-扩展库"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=你是一名自动化科研系统中的“扩展文献筛选智能体”。\n\n当前任务：\n{{$json.task_name}}\n\n用户研究问题：\n{{$json.question}}\n\n研究领域：\n{{$json.domain}}\n\n本节点处于“科学文献自动理解工作流”的第二轮筛选阶段。\n\n这篇文献可能来自以下来源：\n1. initial_search：OpenAlex 初始关键词检索；\n2. arxiv_search：arXiv 补充数据库检索；\n3. forward_snowball：前向雪球法，即由核心文献的后续引用关系扩展得到；\n4. backward_snowball：引文溯源法，即由核心文献的参考文献扩展得到。\n\n文献来源数据库：\n{{$json.source_database}}\n\n文献来源类型：\n{{$json.source_type}}\n\n如果该文献来自雪球扩展或引文溯源，则其种子文献是：\n{{$json.parent_seed_title}}\n\n现在需要判断下面这篇文献是否应该进入“最终精选文献库”，用于后续科学文献自动理解。\n\n论文信息：\n标题：{{$json.title}}\n作者：{{$json.authors}}\n年份：{{$json.year}}\n期刊/会议：{{$json.venue}}\n引用量：{{$json.citation_count}}\n关键词/概念：{{$json.concepts}}\n摘要：{{$json.abstract}}\n\n筛选目标：\n本节点的目标是形成“最终精选文献库”，但不要过度严格。最终精选文献库应尽量覆盖用户问题相关的不同方面，以便后续报告能够进行主题分类、方法理解、证据强弱判断和局限性整理。\n\n请优先 include 以下类型文献：\n1. 与 AI 辅助蛋白质结构设计、蛋白质功能优化、治疗性蛋白设计直接相关的文献；\n2. 与抗体设计、纳米抗体优化、抗体模拟物、PROTAC、靶向蛋白降解、靶向治疗蛋白相关的文献；\n3. 与蛋白质语言模型、生成式 AI、扩散模型、深度学习、机器学习、结构预测、结合亲和力优化相关的文献；\n4. 与蛋白质-蛋白质相互作用预测、结合自由能预测、分子动力学验证、结构约束设计相关的文献；\n5. 能够补充方法背景、关键工具、代表性应用、基准评估或综述背景的文献；\n6. 来自 forward_snowball 且与种子文献在方法、应用或主题上有明确关联的文献；\n7. 来自 backward_snowball 且能提供基础方法、理论来源、经典模型或关键背景的文献；\n8. arXiv 预印本文献如果主题相关，也可以 include，不要因为 citation_count 为 0 就排除。\n\n请 exclude 以下类型文献：\n1. 与 AI、蛋白质设计、蛋白质结构预测、蛋白质工程或靶向治疗基本无关的文献；\n2. 只讨论一般药物发现，但没有蛋白质结构设计、蛋白质功能优化或 AI 方法内容的文献；\n3. 摘要信息严重不足，无法判断研究问题、方法或贡献的文献；\n4. 明显是会议通知、书评、新闻、专利摘要或非学术研究内容；\n5. 与用户问题只有非常弱的关键词重合，但没有实质关联的文献。\n\n筛选宽松度要求：\n1. 不要求文献同时满足“AI + 靶向治疗 + 蛋白质结构设计 + 功能优化”全部条件；\n2. 只要文献能够帮助理解用户问题的一个重要侧面，就可以 include；\n3. 如果文献是综述、方法论文、工具论文、预印本或基准论文，只要相关，都可以 include；\n4. 如果一篇文献能作为背景文献或方法来源，也可以 include；\n5. 目标是最终保留约 5 到 8 篇高相关或中高相关文献，而不是只保留 1 篇最相关文献。\n\n请注意：\n1. 本节点的目标是“文献理解前的精选筛选”，不是研究方向发现；\n2. 不要生成新的研究假设；\n3. 不要扩展未来研究方向；\n4. 不要把文献局限性转化为研究课题；\n5. 只判断是否进入最终精选数据库；\n6. 判断时要同时考虑用户问题、摘要内容、来源类型和种子文献关系。\n\n请只输出 JSON，不要输出解释性文字。\n\n输出格式：\n{\n  \"title\": \"论文标题\",\n  \"decision\": \"include 或 exclude\",\n  \"score\": 0到100之间的整数,\n  \"reason\": \"筛选理由，说明为什么该文献适合或不适合进入最终精选文献库\",\n  \"evidence_type\": \"method / model / dataset / benchmark / review / application / theory / tool / background / other\",\n  \"source_type\": \"initial_search / arxiv_search / forward_snowball / backward_snowball / other\",\n  \"snowball_relation\": \"如果来自 forward_snowball，请说明它如何引用并延伸种子文献；如果来自 backward_snowball，请说明它如何作为种子文献的参考基础；如果不是扩展文献，填 none\",\n  \"relation_to_question\": \"说明这篇论文与用户研究问题的关系\"\n}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        896,
+        192
+      ],
+      "id": "37454a2d-6a17-4e29-96c2-906da1ad6ae3",
+      "name": "精筛扩展文献链"
+    },
+    {
+      "parameters": {
+        "jsCode": "const screeningItems = $input.all();\nconst paperItems = $('去重文献-扩展库').all();\n\nfunction getRawOutput(json) {\n  let raw =\n    json.output ||\n    json.text ||\n    json.response ||\n    json.message ||\n    json.content ||\n    json.result ||\n    json.choices?.[0]?.message?.content ||\n    '';\n\n  if (typeof raw === 'object' && raw.content) {\n    raw = raw.content;\n  }\n\n  if (typeof raw !== 'string') {\n    raw = JSON.stringify(raw);\n  }\n\n  return raw.trim();\n}\n\nfunction cleanJsonText(raw) {\n  return raw\n    .replace(/```json/g, '')\n    .replace(/```/g, '')\n    .trim();\n}\n\nfunction extractJson(raw) {\n  const cleaned = cleanJsonText(raw);\n\n  try {\n    return JSON.parse(cleaned);\n  } catch (e) {\n    const start = cleaned.indexOf('{');\n    const end = cleaned.lastIndexOf('}');\n    if (start !== -1 && end !== -1 && end > start) {\n      const possibleJson = cleaned.slice(start, end + 1);\n      try {\n        return JSON.parse(possibleJson);\n      } catch (e2) {\n        return null;\n      }\n    }\n    return null;\n  }\n}\n\nreturn screeningItems.map((item, index) => {\n  const raw = getRawOutput(item.json);\n  const parsed = extractJson(raw);\n\n  const originalPaper = paperItems[index]?.json || {};\n\n  let decision = parsed?.decision || 'exclude';\n  decision = String(decision).toLowerCase().trim();\n\n  if (!['include', 'exclude'].includes(decision)) {\n    decision = decision.includes('include') || decision.includes('保留') ? 'include' : 'exclude';\n  }\n\n  let score = Number(parsed?.score ?? 0);\n  if (Number.isNaN(score)) {\n    score = 0;\n  }\n\n  return {\n    json: {\n      ...originalPaper,\n\n      // 第二轮筛选结果\n      final_screen_decision: decision,\n      final_screen_score: score,\n      final_screen_reason: parsed?.reason || '',\n      final_evidence_type: parsed?.evidence_type || originalPaper.evidence_type || '',\n      snowball_relation: parsed?.snowball_relation || '',\n      final_relation_to_question: parsed?.relation_to_question || '',\n\n      // 保留第一轮筛选结果，方便对比\n      first_screen_decision: originalPaper.screen_decision || '',\n      first_screen_score: originalPaper.screen_score || '',\n      first_screen_reason: originalPaper.screen_reason || '',\n\n      expanded_screening_raw_output: raw\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        192
+      ],
+      "id": "4b4eb2dc-56b6-4d04-a1bf-c241478b8d59",
+      "name": "解析精筛结果"
+    },
+    {
+      "parameters": {
+        "jsCode": "const papers = $input.all().map(item => item.json);\n\n// 只把 AI 二次筛选认为比较相关的文献交给人类复核\n// include 全部保留；如果不是 include，但分数 >= 70，也进入人工候选，避免漏掉边界文献\nconst candidates = papers\n  .filter(paper => {\n    const decision = String(paper.final_screen_decision || '').toLowerCase().trim();\n    const score = Number(paper.final_screen_score || 0);\n    return decision === 'include' || score >= 70;\n  })\n  .sort((a, b) => Number(b.final_screen_score || 0) - Number(a.final_screen_score || 0))\n  .map((paper, index) => {\n    const reviewId = index + 1;\n\n    return {\n      ...paper,\n      review_id: reviewId\n    };\n  });\n\nfunction shortText(text, maxLen = 350) {\n  const s = String(text || '').replace(/\\s+/g, ' ').trim();\n  if (!s) return '无摘要信息';\n  return s.length > maxLen ? s.slice(0, maxLen) + '...' : s;\n}\n\nconst reviewLines = [];\n\nreviewLines.push('# 人工复核候选文献列表');\nreviewLines.push('');\nreviewLines.push('请阅读下面的候选文献，并在下一步表单中输入你希望保留的文献序号。');\nreviewLines.push('');\nreviewLines.push('输入示例：');\nreviewLines.push('');\nreviewLines.push('```');\nreviewLines.push('1,3,5,8');\nreviewLines.push('```');\nreviewLines.push('');\nreviewLines.push('如果你想全部保留，可以输入：');\nreviewLines.push('');\nreviewLines.push('```');\nreviewLines.push('all');\nreviewLines.push('```');\nreviewLines.push('');\nreviewLines.push('---');\nreviewLines.push('');\n\nfor (const paper of candidates) {\n  reviewLines.push(`## ${paper.review_id}. ${paper.title || '无标题'}`);\n  reviewLines.push('');\n  reviewLines.push(`- 年份：${paper.year || '未知'}`);\n  reviewLines.push(`- 来源数据库：${paper.source_database || '未知'}`);\n  reviewLines.push(`- 来源类型：${paper.source_type || '未知'}`);\n  reviewLines.push(`- 雪球/溯源种子文献：${paper.parent_seed_title || '无'}`);\n  reviewLines.push(`- AI 二次筛选结果：${paper.final_screen_decision || '未知'}`);\n  reviewLines.push(`- AI 二次筛选分数：${paper.final_screen_score ?? '未知'}`);\n  reviewLines.push(`- AI 筛选理由：${paper.final_screen_reason || '未提供'}`);\n  reviewLines.push('');\n  reviewLines.push(`摘要片段：${shortText(paper.abstract)}`);\n  reviewLines.push('');\n  reviewLines.push('---');\n  reviewLines.push('');\n}\n\nreturn [\n  {\n    json: {\n      task_name: candidates[0]?.task_name || papers[0]?.task_name || '',\n      question: candidates[0]?.question || papers[0]?.question || '',\n      domain: candidates[0]?.domain || papers[0]?.domain || '',\n      output_language: candidates[0]?.output_language || papers[0]?.output_language || '中文',\n\n      review_candidate_count: candidates.length,\n      review_summary_markdown: reviewLines.join('\\n'),\n      review_candidates: candidates,\n\n      human_review_instruction: '请在下一步输入要保留的文献序号，例如：1,3,5,8；如果全部保留，输入 all。'\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        192
+      ],
+      "id": "477996cb-3c5c-45d3-9bd4-1c8412e93c88",
+      "name": "准备人工复核摘要"
+    },
+    {
+      "parameters": {
+        "resume": "form",
+        "formTitle": "人工复核候选文献",
+        "formDescription": "={{$json.review_summary_markdown}}",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "human_keep_ids",
+              "fieldType": "textarea",
+              "placeholder": "例如：1,3,5,8；如果全部保留，输入 all",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "human_review_note",
+              "fieldType": "textarea",
+              "placeholder": "可选：填写人工复核备注"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1696,
+        192
+      ],
+      "id": "6478d79e-64ba-483f-a581-c68669ba4bd3",
+      "name": "等待人工复核",
+      "webhookId": "4e394b17-b40d-4c16-bea1-f24d02803f71"
+    },
+    {
+      "parameters": {
+        "jsCode": "const waitOutput = $input.first().json;\n\n// 从 Prepare Human Review Summary 取候选文献列表\nconst reviewData = $('准备人工复核摘要').first().json;\nconst candidates = reviewData.review_candidates || [];\n\n// 兼容不同 n8n 版本中 Wait 表单输出字段的位置\nconst rawKeepIds =\n  waitOutput.human_keep_ids ||\n  waitOutput.data?.human_keep_ids ||\n  waitOutput.formData?.human_keep_ids ||\n  waitOutput.body?.human_keep_ids ||\n  '';\n\nconst humanReviewNote =\n  waitOutput.human_review_note ||\n  waitOutput.data?.human_review_note ||\n  waitOutput.formData?.human_review_note ||\n  waitOutput.body?.human_review_note ||\n  '';\n\nfunction parseKeepIds(raw) {\n  const text = String(raw || '').trim();\n\n  if (!text) {\n    return new Set();\n  }\n\n  if (text.toLowerCase() === 'all' || text === '全部') {\n    return 'all';\n  }\n\n  const ids = text\n    .replace(/，/g, ',')\n    .split(',')\n    .map(x => Number(String(x).trim()))\n    .filter(x => Number.isFinite(x) && x > 0);\n\n  return new Set(ids);\n}\n\nconst keepIds = parseKeepIds(rawKeepIds);\n\nlet selected = [];\n\nif (keepIds === 'all') {\n  selected = candidates;\n} else {\n  selected = candidates.filter(paper => keepIds.has(Number(paper.review_id)));\n}\n\nreturn selected.map((paper, index) => ({\n  json: {\n    ...paper,\n\n    // 人工复核信息\n    human_review_decision: 'include',\n    human_review_rank: index + 1,\n    human_keep_ids: rawKeepIds,\n    human_review_note: humanReviewNote,\n\n    // 为了兼容后续节点，也把最终筛选结果统一改成人工确认后的 include\n    final_screen_decision: 'include',\n    final_screen_score: paper.final_screen_score || paper.screen_score || '',\n    final_screen_reason:\n      paper.final_screen_reason ||\n      paper.screen_reason ||\n      '人工复核后保留'\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        192
+      ],
+      "id": "fab37ac4-066c-43e4-bc56-fdd0a71f26f0",
+      "name": "应用人工复核结果"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=你是一名自动化科研系统中的“文献理解智能体”。\n\n当前任务：\n{{$json.task_name}}\n\n用户研究问题：\n{{$json.question}}\n\n研究领域：\n{{$json.domain}}\n\n现在请对下面这篇已经通过初筛的论文进行结构化理解，并生成一张“证据卡片”。\n\n论文信息：\n标题：{{$json.title}}\n作者：{{$json.authors}}\n年份：{{$json.year}}\n期刊/会议：{{$json.venue}}\n引用量：{{$json.citation_count}}\n关键词/概念：{{$json.concepts}}\n摘要：{{$json.abstract}}\n链接：{{$json.url}}\n\n前一步筛选结果：\n筛选分数：{{$json.screen_score}}\n筛选理由：{{$json.screen_reason}}\n证据类型：{{$json.evidence_type}}\n与问题关系：{{$json.relation_to_question}}\n\n请只输出 JSON，不要输出解释性文字。\n\n输出格式：\n{\n  \"title\": \"论文标题\",\n  \"year\": \"发表年份\",\n  \"research_problem\": \"这篇论文主要解决什么问题\",\n  \"method\": \"这篇论文使用了什么方法或模型\",\n  \"main_contribution\": \"这篇论文的主要贡献\",\n  \"key_findings\": [\n    \"关键发现1\",\n    \"关键发现2\",\n    \"关键发现3\"\n  ],\n  \"limitations\": [\n    \"局限性1\",\n    \"局限性2\"\n  ],\n  \"usable_evidence\": [\n    {\n      \"claim\": \"可以被后续综述或研究方向使用的观点\",\n      \"support\": \"该观点来自论文摘要或论文信息中的依据\",\n      \"evidence_type\": \"method / model / dataset / benchmark / application / review / theory / other\"\n    }\n  ],\n \"reported_limitations\": \"论文中明确提到的局限性或证据不足\",\n\"open_issues_for_manual_check\": \"需要人工进一步确认的问题，不直接作为研究方向\"\n  \"relation_to_user_question\": \"这篇论文如何支撑用户提出的研究问题\"\n}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        2144,
+        192
+      ],
+      "id": "179812e5-3aa9-4128-9685-9afaa3555ace",
+      "name": "理解精选文献链"
+    },
+    {
+      "parameters": {
+        "jsCode": "const evidenceItems = $input.all();\nconst includedPapers = $('应用人工复核结果').all();\n\nfunction getRawOutput(json) {\n  let raw =\n    json.output ||\n    json.text ||\n    json.response ||\n    json.message ||\n    json.content ||\n    json.result ||\n    json.choices?.[0]?.message?.content ||\n    '';\n\n  if (typeof raw === 'object' && raw.content) {\n    raw = raw.content;\n  }\n\n  if (typeof raw !== 'string') {\n    raw = JSON.stringify(raw);\n  }\n\n  return raw.trim();\n}\n\nfunction cleanJsonText(raw) {\n  return raw\n    .replace(/```json/g, '')\n    .replace(/```/g, '')\n    .trim();\n}\n\nfunction extractJson(raw) {\n  const cleaned = cleanJsonText(raw);\n\n  try {\n    return JSON.parse(cleaned);\n  } catch (e) {\n    const start = cleaned.indexOf('{');\n    const end = cleaned.lastIndexOf('}');\n    if (start !== -1 && end !== -1 && end > start) {\n      const possibleJson = cleaned.slice(start, end + 1);\n      try {\n        return JSON.parse(possibleJson);\n      } catch (e2) {\n        return null;\n      }\n    }\n    return null;\n  }\n}\n\nfunction toText(value) {\n  if (Array.isArray(value)) {\n    return value.join('；');\n  }\n  if (value && typeof value === 'object') {\n    return JSON.stringify(value, null, 2);\n  }\n  return value || '';\n}\n\nreturn evidenceItems.map((item, index) => {\n  const raw = getRawOutput(item.json);\n  const parsed = extractJson(raw);\n\n  const originalPaper = includedPapers[index]?.json || {};\n\n  return {\n    json: {\n      // 原始论文信息\n      rank: originalPaper.rank || index + 1,\n      paper_id: originalPaper.paper_id || '',\n      title: originalPaper.title || parsed?.title || '',\n      authors: originalPaper.authors || '',\n      year: originalPaper.year || parsed?.year || '',\n      venue: originalPaper.venue || '',\n      citation_count: originalPaper.citation_count || 0,\n      doi: originalPaper.doi || '',\n      url: originalPaper.url || '',\n      concepts: originalPaper.concepts || '',\n      abstract: originalPaper.abstract || '',\n\n      // 筛选信息\n      screen_decision: originalPaper.screen_decision || '',\n      screen_score: originalPaper.screen_score || '',\n      screen_reason: originalPaper.screen_reason || '',\n      evidence_type: originalPaper.evidence_type || '',\n      relation_to_question: originalPaper.relation_to_question || '',\n\n      // 证据卡片信息\n      research_problem: parsed?.research_problem || '',\n      method: parsed?.method || '',\n      main_contribution: parsed?.main_contribution || '',\n      key_findings: toText(parsed?.key_findings),\n      limitations: toText(parsed?.limitations),\n      usable_evidence: toText(parsed?.usable_evidence),\n   reported_limitations: parsed?.reported_limitations || '',\nopen_issues_for_manual_check: parsed?.open_issues_for_manual_check || '',\n      relation_to_user_question: parsed?.relation_to_user_question || '',\n\n      // 上游任务信息\n      query: originalPaper.query || '',\n      question: originalPaper.question || '',\n      domain: originalPaper.domain || '',\n      output_language: originalPaper.output_language || '中文',\n      task_name: originalPaper.task_name || '',\n\n      // 便于调试\n      evidence_raw_output: raw,\n\n      //来源\n      source_database: originalPaper.source_database || '',\n      source_type: originalPaper.source_type || '',\n      parent_seed_title: originalPaper.parent_seed_title || '',\n      parent_seed_id: originalPaper.parent_seed_id || '',\n      openalex_id: originalPaper.openalex_id || '',\n      arxiv_id: originalPaper.arxiv_id || '',\n      dedup_key: originalPaper.dedup_key || '',\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2496,
+        192
+      ],
+      "id": "7ff0e8ae-610a-4807-9974-1dd97d485629",
+      "name": "解析证据卡片"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cards = $input.all().map(item => item.json);\n\nconst first = cards[0] || {};\n\nfunction safeCount(nodeName) {\n  try {\n    return $(nodeName).all().length;\n  } catch (e) {\n    return 0;\n  }\n}\n\nfunction countBy(items, field) {\n  const stats = {};\n  for (const item of items) {\n    const key = item[field] || 'unknown';\n    stats[key] = (stats[key] || 0) + 1;\n  }\n  return stats;\n}\n\nconst evidenceCards = cards.map((card, index) => ({\n  index: index + 1,\n  title: card.title || '',\n  authors: card.authors || '',\n  year: card.year || '',\n  venue: card.venue || '',\n  citation_count: card.citation_count || 0,\n  url: card.url || '',\n  doi: card.doi || '',\n  source_database: card.source_database || '',\n  source_type: card.source_type || '',\n  parent_seed_title: card.parent_seed_title || '',\n  screen_score: card.screen_score || card.final_screen_score || '',\n  screen_reason: card.screen_reason || card.final_screen_reason || '',\n  research_problem: card.research_problem || '',\n  method: card.method || '',\n  main_contribution: card.main_contribution || '',\n  key_findings: card.key_findings || '',\n  limitations: card.limitations || '',\n  usable_evidence: card.usable_evidence || '',\n  reported_limitations: card.reported_limitations || '',\n  open_issues_for_manual_check: card.open_issues_for_manual_check || '',\n  relation_to_user_question: card.relation_to_user_question || ''\n}));\n\nconst sourceStats = {\n  by_database: countBy(evidenceCards, 'source_database'),\n  by_source_type: countBy(evidenceCards, 'source_type')\n};\n\nreturn [\n  {\n    json: {\n      task_name: first.task_name || 'AI驱动蛋白质结构设计文献自动理解',\n      question: first.question || '',\n      domain: first.domain || '',\n      query: first.query || '',\n      output_language: first.output_language || '中文',\n      selected_paper_count: evidenceCards.length,\n      evidence_cards: evidenceCards,\n\n      database_construction: {\n        openalex_arxiv_merged_count: safeCount('Merge OpenAlex and arXiv Papers'),\n        multi_source_deduplicated_count: safeCount('Deduplicate Multi-source Papers'),\n        first_round_included_count: safeCount('Keep Included Papers'),\n        forward_snowball_candidate_count: safeCount('Normalize Citing Papers'),\n        backward_snowball_candidate_count: safeCount('Normalize Referenced Works'),\n        expanded_merged_count: safeCount('Merge Original and Snowball Papers'),\n        expanded_deduplicated_count: safeCount('Deduplicate Papers'),\n        final_selected_count: evidenceCards.length,\n        final_source_statistics: sourceStats\n      }\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2720,
+        192
+      ],
+      "id": "0a5e12c9-bf80-41d5-89c5-0c9e2ad88833",
+      "name": "汇总证据卡片"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=你是一名自动化科研系统中的“科学文献理解智能体”。\n\n当前任务：\n{{$json.task_name}}\n\n用户研究问题：\n{{$json.question}}\n\n研究领域：\n{{$json.domain}}\n\n本次检索使用的关键词：\n{{$json.query}}\n\n最终精选文献数量：\n{{$json.selected_paper_count}}\n\n系统实际文献库构建信息如下：\n{{ JSON.stringify($json.database_construction, null, 2) }}\n\n下面是系统自动生成的证据卡片：\n{{ JSON.stringify($json.evidence_cards, null, 2) }}\n\n请根据以上信息，生成一份结构化的“科学文献自动理解报告”。\n\n【强制输出结构要求，必须严格执行】\n\n本次最终报告只允许输出以下 6 个部分：\n\n# AI驱动的科学文献自动理解报告：以蛋白质结构设计为例\n\n**用户问题：{{$json.question}}**\n\n## 1. 文献主题分类\n## 2. 单篇文献结构化理解\n## 3. 方法与技术路线理解\n## 4. 文献中的共识、差异与争议\n## 5. 文献局限性与证据不足\n## 6. 小结\n\n严禁输出以下标题或内容：\n- 用户问题与理解目标\n- 自动化文献理解流程概述\n- 文献库构建与补充过程\n- 检索与筛选结果概览\n- 证据卡片汇总\n- 证据卡片汇总表\n- 对后续自动化科研模块的输入\n- 质量控制与人工复核点\n- 5.4 自动化流程带来的数据质量问题\n- 当前自动化流程带来的数据质量问题\n- 数据质量问题作为独立小节\n- 本报告没有主动生成新的科学假设，而是为后续综述构建、科学发现、建模实验和学术写作提供结构化输入\n- 本报告未主动生成新的科学假设，而是为后续综述构建、科学发现、建模实验和学术写作提供结构化、可追溯的输入\n\n如果后面的任何指令与本段冲突，必须以本段为准。\n不要使用原来的编号 5、6、7、8、9、10、13。\n必须重新编号为 1 到 6。\n不要输出寒暄语、确认语、身份说明或“好的，作为……”之类的开头。\n请直接从 Markdown 一级标题开始输出。\n\n重要定位：\n1. 本报告的目标是“理解已有科学文献”，不是“自动发现新研究方向”。\n2. 不要主动提出新的科学假设。\n3. 不要将文献局限性扩展成新的研究课题。\n4. 不要输出“未来研究方向”“可继续探索的问题”“科学发现建议”等偏科学发现的内容。\n5. 所有结论必须来自 evidence_cards 或 database_construction。\n6. 如果证据卡片不足，要明确说明“当前证据不足”。\n7. 每个重要判断都要标注文献依据，优先使用论文标题作为依据。\n8. 输出内容要适合作为教材中“AI驱动的科学文献自动理解”案例。\n9. 不要虚构未出现在证据卡片或 database_construction 中的信息。\n\n数据库与流程约束：\n1. 如果系统信息中只出现 OpenAlex 和 arXiv，就只能写 OpenAlex 和 arXiv。\n2. 不要写 PubMed、Crossref、Semantic Scholar、Google Scholar 等未实际使用的数据库，除非它们真实出现在 source_database 字段中。\n3. 不要写 GPT-4、Claude、ChatGPT 等具体模型名，除非它们真实出现在输入字段中。统一写“大语言模型”。\n4. 当前流程主要基于标题、摘要和元数据进行理解；除非证据卡片明确包含全文内容，否则不要写“全文理解”“全文分析”。\n5. arXiv 文献可能没有引用量，因此不要因为 citation_count 为 0 就判定其质量低。\n6. 如果某个数量字段缺失、为 0 或无法解释，请写“当前工作流未记录该数量”，不要编造。\n7. 如果 source_database、source_type、parent_seed_title 缺失，要如实写“证据卡片未提供”。\n\n术语统一要求：\n1. source_type = initial_search 时，统一称为“初始检索”。\n2. source_type = arxiv_search 时，统一称为“arXiv 补充检索”。\n3. source_type = forward_snowball 时，统一称为“前向雪球法”。\n4. source_type = backward_snowball 时，统一称为“引文溯源法（backward snowballing）”。\n5. 不要使用“后向雪球法”这个表述。\n6. 前向雪球法指“查找引用种子文献的后续研究”。\n7. 引文溯源法指“查找种子文献引用过的参考文献、基础方法、经典工具或数据资源”。\n\n请使用 {{$json.output_language}} 输出，并严格按照以下 Markdown 结构生成报告：\n\n# AI驱动的科学文献自动理解报告：以蛋白质结构设计为例\n\n**用户问题：{{$json.question}}**\n\n## 1. 文献主题分类\n\n请根据证据卡片，将文献按主题进行归类。\n\n可以包括但不限于：\n- AI辅助抗体或抗体模拟物设计；\n- 蛋白质结构预测与结构优化；\n- 蛋白质语言模型与序列优化；\n- 蛋白质-蛋白质相互作用预测；\n- 生成式模型辅助蛋白质设计；\n- 分子动力学与结构验证；\n- 靶向治疗蛋白功能优化；\n- 基础数据资源与传统计算工具；\n- AI药物发现背景与间接支撑文献。\n\n要求：\n- 如果证据卡片中没有某类主题，不要强行加入；\n- 每个主题都要说明包含哪些文献；\n- 每个主题都要说明这些文献主要讨论什么；\n- 每个主题都要说明它们如何帮助理解用户问题；\n- 如果某些文献只是基础工具、数据资源或间接支撑文献，要明确说明其证据属性；\n- 如果文献数量较少、重复较多或来源信息缺失，要说明主题分类的可靠性有限；\n- 不要把“主题分类”扩展成“未来研究方向”。\n\n## 2. 单篇文献结构化理解\n\n请根据证据卡片，对每篇最终精选文献进行结构化理解。\n\n每篇文献包括：\n- 论文标题；\n- 来源数据库与来源类型；\n- 如果来自前向雪球法，说明它由哪篇种子文献扩展得到；\n- 如果来自引文溯源法（backward snowballing），说明它作为哪篇种子文献的参考文献被补充进来；\n- 研究问题；\n- 使用方法；\n- 主要贡献；\n- 关键发现；\n- 局限性；\n- 与用户问题的关系。\n\n注意：\n- 这里只做“理解与整理”，不要扩展成新的研究方向；\n- 如果某篇文献信息不完整，请明确说明“当前证据卡片未提供完整信息”；\n- 如果某篇文献的标题与证据内容明显不匹配，请标记“证据卡片可能错位，需要人工复核”，不要据此做强结论；\n- 如果存在重复文献，可以合并讨论，但要说明“疑似重复记录”；\n- 对于引文溯源法得到的基础工具、数据库或经典方法文献，要说明其是“背景支撑证据”，不要夸大为直接回答用户问题的核心AI方法。\n\n## 3. 方法与技术路线理解\n\n请总结证据卡片中出现的方法和技术路线。\n\n每种方法包括：\n- 方法名称；\n- 主要用途；\n- 代表文献；\n- 在蛋白质结构设计或功能优化中的作用；\n- 与用户问题相关的证据强度。\n\n请用表格输出：\n\n| 方法名称 | 主要用途 | 代表文献 | 在蛋白质结构设计/功能优化中的作用 | 与用户问题相关的证据强度 |\n|---|---|---|---|---|\n\n最后一列“与用户问题相关的证据强度”不是评价论文质量、期刊水平、引用量或方法本身的重要性，而是评价该方法对用户问题“AI如何辅助靶向治疗蛋白结构设计和功能优化”的支撑强弱。\n\n证据强度请根据以下依据判断：\n\n- 强：文献直接围绕 AI 辅助蛋白质结构设计、治疗性蛋白设计、抗体/双特异性抗体优化、蛋白质语言模型、结构预测或功能优化展开，并且有具体模型、实验验证、基准测试或明确应用案例支撑。\n- 中：文献与用户问题有明确关系，但主要是综述性论述、背景框架、方法总结或间接案例，缺少充分定量验证，或没有专门针对靶向治疗蛋白进行实验验证。\n- 弱：文献只是基础工具、数据库、传统计算方法、宏观药物发现背景，或者只与用户问题存在间接关系，不能直接说明 AI 如何辅助靶向治疗蛋白结构设计和功能优化。\n\n注意：\n- 这里是“方法理解”，不是“未来技术路线预测”；\n- 不要根据常识补充证据卡片中没有的方法；\n- 如果某方法只由综述提及，证据强度通常不应标为“强”；\n- 如果某方法是传统工具或数据资源，而不是AI方法，要明确说明它是支撑性工具或背景资源；\n- 不要把非AI工具强行说成AI方法。\n\n## 4. 文献中的共识、差异与争议\n\n请从证据卡片中归纳：\n- 多篇文献共同支持的观点；\n- 不同文献之间的侧重点差异；\n- 是否存在尚未充分一致的观点；\n- 哪些结论证据较强；\n- 哪些结论证据较弱。\n\n要求：\n- 不要生成新的假设；\n- 只做文献间关系理解；\n- 如果证据卡片数量较少、重复较多或来源信息缺失，要明确说明结论的可靠性有限；\n- 如果没有足够文献支撑共识或争议，不要强行总结；\n- 对于只有单篇文献支持的观点，必须说明证据有限；\n- 对于工具类、数据库类、综述类文献，要区分其与原创研究论文的证据强度差异。\n\n## 5. 文献局限性与证据不足\n\n请整理文献中已经明确提到或由证据卡片显示出的局限性。\n\n本节只允许包含以下三个小节：\n\n### 5.1 文献自身明确提到的局限性\n\n请整理证据卡片中每篇文献自身明确提到或可由证据卡片直接支持的局限性。\n\n要求：\n- 按文献逐条说明；\n- 不要加入证据卡片中没有的信息；\n- 不要把局限性扩展成新的研究方向。\n\n### 5.2 证据卡片显示出的信息不足\n\n请说明当前证据卡片中哪些信息不足以支撑强结论。\n\n可以包括：\n- 缺少具体算法细节；\n- 缺少实验验证；\n- 缺少定量性能比较；\n- 缺少与靶向治疗蛋白直接相关的案例；\n- 某些字段需要人工复核。\n\n### 5.3 文献库覆盖不足的问题\n\n请说明当前精选文献库在覆盖范围上的不足。\n\n可以包括：\n- 某些主题文献数量较少；\n- 某些方向只有综述文献，缺少原创研究；\n- 某些文献只是工具或数据资源，不能直接回答用户问题；\n- 与用户问题直接相关的证据仍然有限。\n\n严格禁止输出以下小节：\n- “5.4 自动化流程带来的数据质量问题”\n- “当前自动化流程带来的数据质量问题”\n- “流程质量问题”\n- “数据质量问题”\n\n注意：\n- 本节只写“文献局限性”和“证据不足”；\n- 不要进一步扩展成“研究空白”或“后续研究方向”；\n- 如果某个局限性只由单篇文献支持，要说明证据较弱；\n- 如果某个问题需要人工核查，请标记为“需人工复核”；\n- 如果最终精选文献数量少于 3 篇，请明确说明：“当前最终精选文献数量偏少，本报告更适合作为自动化文献理解流程演示，而不是完整领域综述。”\n\n## 6. 小结\n\n请用一段话总结：\n本案例如何通过 n8n 和大语言模型，将一个科研问题转化为可执行的科学文献自动理解流程，并最终形成结构化文献理解结果。\n\n需要强调：\n- 系统使用 OpenAlex 作为主数据库；\n- 系统使用 arXiv 作为补充数据库；\n- 系统通过合并与去重构建初始数据库；\n- 系统通过前向雪球法补充引用核心文献的后续相关研究；\n- 系统通过引文溯源法（backward snowballing）补充核心文献引用过的基础方法、经典工具或数据资源；\n- 系统通过二次筛选和人机交互形成最终精选文献库；\n- 系统将精选文献转化为结构化证据卡片；\n- 系统最终输出可复用、可追溯的文献理解报告；\n- 如果当前报告存在重复文献、来源字段缺失或证据错位，要诚实指出这些是后续需要人工复核和流程优化的问题。\n\n不要在小结结尾输出以下句子或任何近似表达：\n“本报告没有主动生成新的科学假设，而是为后续综述构建、科学发现、建模实验和学术写作提供结构化输入。”\n“本报告未主动生成新的科学假设，而是为后续综述构建、科学发现、建模实验和学术写作提供结构化、可追溯的输入。”",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        2944,
+        192
+      ],
+      "id": "8fc4b3f0-ecdb-47ba-8a89-7487e4aa825e",
+      "name": "生成文献理解报告链"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nfunction getReportText(json) {\n  let raw =\n    json.output ||\n    json.text ||\n    json.response ||\n    json.message ||\n    json.content ||\n    json.result ||\n    json.choices?.[0]?.message?.content ||\n    '';\n\n  if (typeof raw === 'object' && raw.content) {\n    raw = raw.content;\n  }\n\n  if (typeof raw !== 'string') {\n    raw = JSON.stringify(raw, null, 2);\n  }\n\n  return raw.trim();\n}\n\nconst markdown = getReportText(input);\n\nconst now = new Date();\nconst dateStr = now.toISOString().slice(0, 10);\n\nconst filename = `AI驱动蛋白质结构设计文献自动理解报告_${dateStr}.md`;\n\nreturn [\n  {\n    json: {\n      filename,\n      markdown_report: markdown,\n      email_subject: `AI驱动蛋白质设计科学文献自动理解报告 - ${dateStr}`,\n      email_body: `您好，\\n\\n附件中是本次 n8n 自动化科研工作流生成的 Markdown 报告。\\n\\n报告主题：AI驱动蛋白质设计科学文献自动理解\\n\\n此报告由以下流程自动生成：\\n问题输入 → 检索式生成 → 文献检索 → 文献筛选 → 证据卡片生成 → 科学文献自动理解 → Markdown 报告输出。\\n\\n请查收附件。\\n`\n    },\n    binary: {\n      data: {\n        data: Buffer.from(markdown, 'utf8').toString('base64'),\n        mimeType: 'text/markdown',\n        fileName: filename,\n        fileExtension: 'md'\n      }\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3296,
+        192
+      ],
+      "id": "024cf4b1-4668-40f4-b3c4-cc8d38bae7bd",
+      "name": "准备Markdown文件"
+    },
+    {
+      "parameters": {
+        "fromEmail": "2698464853@qq.com",
+        "toEmail": "2698464853@qq.com",
+        "subject": "={{$json.email_subject}}",
+        "emailFormat": "text",
+        "options": {
+          "attachments": "data"
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        3520,
+        192
+      ],
+      "id": "8eb28d02-8d50-4d0f-a76c-2b6b132c2066",
+      "name": "发送报告邮件",
+      "webhookId": "c8272004-c403-493a-92e5-cea5407bcd6b",
+      "credentials": {
+        "smtp": {
+          "id": "0nEtj6sRqx01Xy8p",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "表单提交触发": {
+      "main": [
+        [
+          {
+            "node": "标准化用户输入",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "标准化用户输入": {
+      "main": [
+        [
+          {
+            "node": "生成检索式链",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "生成检索式链": {
+      "main": [
+        [
+          {
+            "node": "解析检索式",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "生成检索式模型": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "生成检索式链",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "初筛文献链",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "理解精选文献链",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "生成文献理解报告链",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "精筛扩展文献链",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "解析检索式": {
+      "main": [
+        [
+          {
+            "node": "检索文献-OpenAlex",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "检索文献-arXiv",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "检索文献-OpenAlex": {
+      "main": [
+        [
+          {
+            "node": "标准化文献-OpenAlex",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "标准化文献-OpenAlex": {
+      "main": [
+        [
+          {
+            "node": "合并文献-OpenAlex与arXiv",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "检索文献-arXiv": {
+      "main": [
+        [
+          {
+            "node": "转换arXiv XML为JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "转换arXiv XML为JSON": {
+      "main": [
+        [
+          {
+            "node": "标准化文献-arXiv",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "标准化文献-arXiv": {
+      "main": [
+        [
+          {
+            "node": "合并文献-OpenAlex与arXiv",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "合并文献-OpenAlex与arXiv": {
+      "main": [
+        [
+          {
+            "node": "去重文献-多源检索",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "去重文献-多源检索": {
+      "main": [
+        [
+          {
+            "node": "初筛文献链",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "初筛文献链": {
+      "main": [
+        [
+          {
+            "node": "解析初筛结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "解析初筛结果": {
+      "main": [
+        [
+          {
+            "node": "保留初筛通过文献",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "保留初筛通过文献": {
+      "main": [
+        [
+          {
+            "node": "准备引文扩展种子文献",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "合并扩展文献",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "准备引文扩展种子文献": {
+      "main": [
+        [
+          {
+            "node": "获取引用本文献-前向雪球",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "准备参考文献ID-引文溯源",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "获取引用本文献-前向雪球": {
+      "main": [
+        [
+          {
+            "node": "标准化引用文献-前向雪球",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "标准化引用文献-前向雪球": {
+      "main": [
+        [
+          {
+            "node": "合并扩展文献",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "准备参考文献ID-引文溯源": {
+      "main": [
+        [
+          {
+            "node": "获取参考文献-引文溯源",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "获取参考文献-引文溯源": {
+      "main": [
+        [
+          {
+            "node": "标准化参考文献-引文溯源",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "标准化参考文献-引文溯源": {
+      "main": [
+        [
+          {
+            "node": "合并扩展文献",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "合并扩展文献": {
+      "main": [
+        [
+          {
+            "node": "去重文献-扩展库",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "去重文献-扩展库": {
+      "main": [
+        [
+          {
+            "node": "精筛扩展文献链",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "精筛扩展文献链": {
+      "main": [
+        [
+          {
+            "node": "解析精筛结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "解析精筛结果": {
+      "main": [
+        [
+          {
+            "node": "准备人工复核摘要",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "准备人工复核摘要": {
+      "main": [
+        [
+          {
+            "node": "等待人工复核",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "等待人工复核": {
+      "main": [
+        [
+          {
+            "node": "应用人工复核结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "应用人工复核结果": {
+      "main": [
+        [
+          {
+            "node": "理解精选文献链",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "理解精选文献链": {
+      "main": [
+        [
+          {
+            "node": "解析证据卡片",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "解析证据卡片": {
+      "main": [
+        [
+          {
+            "node": "汇总证据卡片",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "汇总证据卡片": {
+      "main": [
+        [
+          {
+            "node": "生成文献理解报告链",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "生成文献理解报告链": {
+      "main": [
+        [
+          {
+            "node": "准备Markdown文件",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "准备Markdown文件": {
+      "main": [
+        [
+          {
+            "node": "发送报告邮件",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "c0edb988-1751-4002-a54b-b43e319103ea",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "16de8c8f45f736ae4f1597243c498ddf79341e9ce4de2a25f8371bee874a5b3f"
+  },
+  "id": "5CjyxSJ4h4f1v31r",
+  "tags": []
+}
