@@ -1,0 +1,11 @@
+# 密钥（务必不要提交）
+.env
+
+# 输入的 PDF 与生成的输出（保留空目录，忽略内容）
+/papers/*
+/out/*
+!/papers/.gitkeep
+!/out/.gitkeep
+
+# 杂项
+.DS_Store

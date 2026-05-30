@@ -1,0 +1,696 @@
+{
+  "updatedAt": "2026-05-30T08:28:10.881Z",
+  "createdAt": "2026-05-30T05:28:36.956Z",
+  "name": "科学文献精读报告",
+  "description": "读取 /data/papers 下的 PDF，经 MinerU 云端解析出正文/图/表，用 DeepSeek V4 Pro 逐篇做正文+图+表分析，组装成\"图在上分析在下\"的 Markdown（每篇存 /data/out），合并为完整报告并以自包含 HTML 附件发送到 QQ 邮箱。",
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "453ed1ad-5b79-4cd6-8fad-519b01cbcec0",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "id": "bdf4ec6c-e9c3-450f-b3be-a2f6e693b20a",
+      "name": "Read PDFs",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        300
+      ],
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "/data/papers/*.pdf"
+      }
+    },
+    {
+      "id": "f1766446-c0c5-45fe-a1f5-7b2a131e4d06",
+      "name": "Build MinerU Batch Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const items = $input.all();\nconst files = items.map(function(it, i){\n  const fn = (it.binary && it.binary.data && it.binary.data.fileName) ? it.binary.data.fileName : (\"paper-\" + (i+1) + \".pdf\");\n  return { name: fn, is_ocr: false, data_id: (\"paper-\" + i) };\n});\nreturn [{ json: { requestBody: { enable_formula: true, enable_table: true, language: \"en\", model_version: \"vlm\", files: files } } }];"
+      }
+    },
+    {
+      "id": "c9982c86-396c-473a-9d10-2e408e47fd0c",
+      "name": "MinerU Submit Batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        600,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://mineru.net/api/v4/file-urls/batch",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.MINERU_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}"
+      }
+    },
+    {
+      "id": "24a7cd6c-c830-4bb8-a78f-7a2632bfe2f3",
+      "name": "Pair PDFs With Upload URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const resp = $(\"MinerU Submit Batch\").first().json;\nconst urls = (resp.data && resp.data.file_urls) || [];\nconst batchId = resp.data && resp.data.batch_id;\nconst pdfs = $(\"Read PDFs\").all();\nreturn pdfs.map(function(it, i){\n  const bin = it.binary || {};\n  const fn = (bin.data && bin.data.fileName) ? bin.data.fileName : (\"paper-\" + (i+1) + \".pdf\");\n  const newBin = {};\n  if (bin.data) { newBin.data = Object.assign({}, bin.data, { mimeType: \"\", fileName: fn }); }\n  return { json: { uploadUrl: urls[i], batchId: batchId, name: fn }, binary: newBin };\n});"
+      }
+    },
+    {
+      "id": "8d260007-ae3d-4714-9356-61d0cf140d07",
+      "name": "Upload PDF To MinerU",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1000,
+        300
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $json.uploadUrl }}",
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data"
+      }
+    },
+    {
+      "id": "4a6b6d8a-b0cb-4fae-8e75-a57d59b40732",
+      "name": "Get MinerU Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://mineru.net/api/v4/extract-results/batch/{{ $(\"Pair PDFs With Upload URLs\").first().json.batchId }}",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.MINERU_TOKEN }}"
+            }
+          ]
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "2060bbe7-1c8a-4690-8801-7b44e40ee844",
+      "name": "All Papers Parsed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1400,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.extract_result.length > 0 && $json.data.extract_result.every(r => [\"done\",\"failed\"].includes(r.state)) }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a20ab6b7-4487-4bd6-bdc4-7070373ad66d",
+      "name": "Split Papers",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        200
+      ],
+      "parameters": {
+        "fieldToSplitOut": "data.extract_result",
+        "include": "noOtherFields"
+      }
+    },
+    {
+      "id": "29436711-9b54-4411-9cc9-76115347ef80",
+      "name": "Read All Paper MDs",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        2000,
+        400
+      ],
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "/data/out/*.md"
+      }
+    },
+    {
+      "id": "9def016e-0f4b-44fd-99fc-658d3aea4817",
+      "name": "Combine Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const NL = String.fromCharCode(10);\nconst items = $input.all();\nconst parts = [];\nfor (let i = 0; i < items.length; i++) {\n  const bin = items[i].binary || {};\n  const key = Object.keys(bin)[0];\n  let txt = \"\";\n  if (key) {\n    try { txt = (await this.helpers.getBinaryDataBuffer(i, key)).toString(\"utf8\"); }\n    catch (e) { txt = Buffer.from(bin[key].data || \"\", \"base64\").toString(\"utf8\"); }\n  }\n  const name = (bin[key] && bin[key].fileName) || (\"paper-\" + i);\n  parts.push({ name: name, txt: txt });\n}\nparts.sort(function(a, b){ return a.name.localeCompare(b.name); });\nconst sep = NL + NL + \"---\" + NL + NL;\nconst header = \"# 文献精读报告\" + NL + NL + \"生成时间：\" + $now.toISO() + NL + NL + \"共 \" + parts.length + \" 篇文献\" + sep;\nconst reportMarkdown = header + parts.map(function(p){ return p.txt; }).join(sep);\nreturn [{ json: { reportMarkdown: reportMarkdown, paperCount: parts.length } }];"
+      }
+    },
+    {
+      "id": "cdb50bbf-089b-45d0-8fcc-8121fd939720",
+      "name": "Report MD To HTML",
+      "type": "n8n-nodes-base.markdown",
+      "typeVersion": 1,
+      "position": [
+        2400,
+        400
+      ],
+      "parameters": {
+        "mode": "markdownToHtml",
+        "markdown": "={{ $json.reportMarkdown }}",
+        "destinationKey": "htmlReport",
+        "options": {
+          "completeHTMLDocument": true,
+          "tables": true,
+          "simpleLineBreaks": true
+        }
+      }
+    },
+    {
+      "id": "9ab477e5-fc2b-4e5c-aefc-4216f5e48c03",
+      "name": "Report HTML To File",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        2600,
+        400
+      ],
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "htmlReport",
+        "binaryPropertyName": "data",
+        "options": {
+          "dataIsBase64": false,
+          "encoding": "utf8",
+          "fileName": "文献精读报告.html",
+          "mimeType": "text/html"
+        }
+      }
+    },
+    {
+      "id": "720a91e2-d4b8-4e2b-ac48-2e6fb936d6c2",
+      "name": "Send To QQ Mail",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2800,
+        400
+      ],
+      "parameters": {
+        "operation": "send",
+        "fromEmail": "={{ $env.QQ_SMTP_USER }}",
+        "toEmail": "={{ $env.QQ_MAIL_TO || $env.QQ_SMTP_USER }}",
+        "subject": "=文献精读报告 {{ $now.toFormat(\"yyyy-MM-dd\") }}",
+        "emailFormat": "html",
+        "html": "={{ $(\"Report MD To HTML\").item.json.htmlReport }}",
+        "options": {
+          "attachments": "data",
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "smtp": {
+          "id": "qqsmtpCRED000001",
+          "name": "QQ SMTP"
+        }
+      },
+      "webhookId": "c13dcb01-ea2f-4f33-b1fa-8ed7d53cd910"
+    },
+    {
+      "id": "8d76842e-4dfa-4ded-b281-c3d122f530f3",
+      "name": "Download Result Zip",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2000,
+        100
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.full_zip_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "380ab867-bd50-4206-941d-6f63ced87ea3",
+      "name": "Decompress Zip",
+      "type": "n8n-nodes-base.compression",
+      "typeVersion": 1.1,
+      "position": [
+        2200,
+        100
+      ],
+      "parameters": {
+        "operation": "decompress",
+        "binaryPropertyName": "data",
+        "outputPrefix": "mu_"
+      }
+    },
+    {
+      "id": "40d09526-95e6-4100-a0d5-a0a662016ec6",
+      "name": "Parse MinerU Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const items = $input.all();\nconst out = [];\nfor (let i = 0; i < items.length; i++) {\n  const bin = items[i].binary || {};\n  let fullText = \"\";\n  let contentList = [];\n  const imagesByName = {};\n  for (const key of Object.keys(bin)) {\n    const meta = bin[key];\n    const name = (meta.fileName || \"\");\n    const lower = name.toLowerCase();\n    let buf;\n    try { buf = await this.helpers.getBinaryDataBuffer(i, key); }\n    catch (e) { buf = Buffer.from(meta.data || \"\", \"base64\"); }\n    if (lower.endsWith(\"content_list.json\")) {\n      try { contentList = JSON.parse(buf.toString(\"utf8\")); } catch (e) {}\n    } else if (lower.endsWith(\".md\")) {\n      const t = buf.toString(\"utf8\");\n      if (t.length > fullText.length) fullText = t;\n    } else if (lower.endsWith(\".jpg\") || lower.endsWith(\".jpeg\") || lower.endsWith(\".png\") || lower.endsWith(\".gif\") || lower.endsWith(\".webp\")) {\n      const ext = lower.split(\".\").pop();\n      const mime = ext === \"png\" ? \"image/png\" : (ext === \"webp\" ? \"image/webp\" : (ext === \"gif\" ? \"image/gif\" : \"image/jpeg\"));\n      const uri = \"data:\" + mime + \";base64,\" + buf.toString(\"base64\");\n      imagesByName[name] = uri;\n      imagesByName[name.split(\"/\").pop()] = uri;\n    }\n  }\n  const figures = []; const tables = []; let fi = 0; let ti = 0;\n  for (const el of contentList) {\n    if (el.type === \"image\") {\n      fi++;\n      const p = el.img_path || el.image_path || \"\";\n      const base = p.split(\"/\").pop();\n      const dataUri = imagesByName[p] || imagesByName[base] || \"\";\n      const cap = Array.isArray(el.image_caption) ? el.image_caption.join(\" \") : (el.image_caption || el.img_caption || \"\");\n      figures.push({ id: (\"fig-\" + fi), caption: cap, dataUri: dataUri });\n    } else if (el.type === \"table\") {\n      ti++;\n      const cap = Array.isArray(el.table_caption) ? el.table_caption.join(\" \") : (el.table_caption || \"\");\n      const body = el.table_body || el.table_html || el.text || \"\";\n      const p2 = el.img_path || \"\"; const base2 = p2.split(\"/\").pop();\n      const dataUri = p2 ? (imagesByName[p2] || imagesByName[base2] || \"\") : \"\";\n      tables.push({ id: (\"tbl-\" + ti), caption: cap, markdown: body, dataUri: dataUri });\n    }\n  }\n  let fileName = \"paper-\" + (i + 1) + \".pdf\";\n  try { fileName = $(\"Loop Over Papers\").first().json.file_name || fileName; } catch (e) {}\n  const baseName = fileName.split(\".\").slice(0, -1).join(\".\") || fileName;\n  out.push({ json: { fileName: fileName, baseName: baseName, fullText: fullText, figures: figures, tables: tables } });\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "d5aacb41-3390-4cd9-b602-4d099ed264b6",
+      "name": "Analyze Paper (DeepSeek + Qwen-VL)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2600,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const NL = String.fromCharCode(10);\nconst items = $input.all();\nconst out = [];\nfor (let idx = 0; idx < items.length; idx++) {\n  const j = items[idx].json;\n  const allFigs = j.figures || [];\n  const figs = allFigs.filter(function(f){ return f.dataUri; });\n  const tbls = j.tables || [];\n  const dsKey = $env.DEEPSEEK_API_KEY;\n  const qwKey = $env.DASHSCOPE_API_KEY;\n  const ctx = (j.fullText || \"\").slice(0, 1500);\n\n  const tblBlocks = tbls.map(function(t){ return t.id + \" 表标题: \" + (t.caption || \"(无)\") + NL + \"表格HTML: \" + (t.markdown || \"(无)\"); }).join(NL + NL);\n  const schemaExample = JSON.stringify({ body: { scientificQuestion: \"\", hypothesis: \"\", novelty: \"\", experimentalSetup: \"\", conclusions: \"\" }, tables: [{ id: \"tbl-1\", analysis: \"\" }] });\n  const dsInstruction = [\"论文全文(Markdown)：\", (j.fullText || \"\").slice(0, 120000), \"\", \"本论文的表（结合表标题、表格HTML与正文，分析关键数据与结论）：\", tblBlocks || \"(无表)\", \"\", \"请严格只输出如下结构 JSON（不要解释或代码块标记）：\", schemaExample, \"全部用中文。tables 为每个表 id 各一项，id 与上面一致。\"].join(NL);\n  const dsBody = { model: \"deepseek-v4-pro\", messages: [{ role: \"system\", content: \"你是严谨的科学论文审稿人，只输出一个 JSON 对象。\" }, { role: \"user\", content: dsInstruction }], response_format: { type: \"json_object\" }, temperature: 0.2, max_tokens: 12000 };\n  const dsPromise = this.helpers.httpRequest({ method: \"POST\", url: \"https://api.deepseek.com/chat/completions\", headers: { Authorization: \"Bearer \" + dsKey, \"Content-Type\": \"application/json\" }, body: dsBody, json: true }).then(function(r){ try { return JSON.parse(r.choices[0].message.content); } catch (e) { return { body: {}, tables: [] }; } }).catch(function(e){ return { body: {}, tables: [], _dsErr: String((e && e.message) || e).slice(0, 120) }; });\n\n  const figPrompt = function(f){ return \"这是论文中的一张图。论文背景节选：\" + ctx + NL + \"图标题：\" + (f.caption || \"(无标题)\") + NL + \"请用中文详细解读这张图：展示了什么内容、关键结构或数据、在论文中的科学意义。直接输出分析，不要客套。\"; };\n  const qwCall = (f) => this.helpers.httpRequest({ method: \"POST\", url: \"https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions\", headers: { Authorization: \"Bearer \" + qwKey, \"Content-Type\": \"application/json\" }, body: { model: \"qwen3-vl-plus\", messages: [{ role: \"user\", content: [{ type: \"image_url\", image_url: { url: f.dataUri } }, { type: \"text\", text: figPrompt(f) }] }], max_tokens: 1200 }, json: true }).then(function(r){ return { id: f.id, analysis: r.choices[0].message.content }; }).catch(function(e){ return { id: f.id, analysis: \"(图分析失败：\" + String((e && e.message) || e).slice(0, 100) + \")\" }; });\n\n  const figureAnalyses = [];\n  for (let i = 0; i < figs.length; i += 5) {\n    const part = await Promise.all(figs.slice(i, i + 5).map(qwCall));\n    for (let k = 0; k < part.length; k++) figureAnalyses.push(part[k]);\n  }\n  const dsResult = await dsPromise;\n  out.push({ json: { fileName: j.fileName, baseName: j.baseName, body: dsResult.body || {}, tableAnalyses: dsResult.tables || [], figureAnalyses: figureAnalyses, figures: allFigs, tables: tbls } });\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "0249a9f2-cf39-43fb-aece-fd813c212e69",
+      "name": "Assemble Paper Markdown",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2800,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "const NL = String.fromCharCode(10);\nconst j = $json;\nconst fileName = j.fileName; const baseName = j.baseName;\nconst figs = j.figures || []; const tbls = j.tables || [];\nconst body = j.body || {};\nconst figAna = {}; (j.figureAnalyses || []).forEach(function(f){ figAna[f.id] = f.analysis; });\nconst tblAna = {}; (j.tableAnalyses || []).forEach(function(t){ tblAna[t.id] = t.analysis; });\nconst L = [];\nL.push(\"# \" + fileName); L.push(\"\");\nL.push(\"## 正文分析\"); L.push(\"\");\nL.push(\"**科学问题：** \" + (body.scientificQuestion || \"\")); L.push(\"\");\nL.push(\"**科学假设：** \" + (body.hypothesis || \"\")); L.push(\"\");\nL.push(\"**创新点：** \" + (body.novelty || \"\")); L.push(\"\");\nL.push(\"**实验设置：** \" + (body.experimentalSetup || \"\")); L.push(\"\");\nL.push(\"**结论：** \" + (body.conclusions || \"\")); L.push(\"\");\nL.push(\"## 图分析\"); L.push(\"\");\nfigs.forEach(function(f){\n  L.push(\"### \" + f.id + (f.caption ? (\" — \" + f.caption) : \"\"));\n  if (f.dataUri) { L.push('<img src=\"' + f.dataUri + '\" style=\"max-width:100%\" />'); }\n  L.push(\"\"); L.push(figAna[f.id] || \"(无分析)\"); L.push(\"\");\n});\nL.push(\"## 表分析\"); L.push(\"\");\ntbls.forEach(function(t){\n  L.push(\"### \" + t.id + (t.caption ? (\" — \" + t.caption) : \"\"));\n  if (t.dataUri) { L.push('<img src=\"' + t.dataUri + '\" style=\"max-width:100%\" />'); }\n  else if (t.markdown) { L.push(\"\"); L.push(t.markdown); }\n  L.push(\"\"); L.push(tblAna[t.id] || \"(无分析)\"); L.push(\"\");\n});\nreturn { json: { fileName: fileName, baseName: baseName, paperMarkdown: L.join(NL) } };"
+      }
+    },
+    {
+      "id": "576df2a9-cb3a-4ba4-ad71-e05f9c1442aa",
+      "name": "Paper MD To File",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        3000,
+        100
+      ],
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "paperMarkdown",
+        "binaryPropertyName": "data",
+        "options": {
+          "dataIsBase64": false,
+          "encoding": "utf8",
+          "fileName": "={{ $json.baseName }}.md",
+          "mimeType": "text/markdown"
+        }
+      }
+    },
+    {
+      "id": "bcf15dd6-81bb-4dc8-a214-3f24c8fafee5",
+      "name": "Write Paper MD",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        3200,
+        100
+      ],
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/data/out/{{ $(\"Assemble Paper Markdown\").item.json.baseName }}.md",
+        "dataPropertyName": "data"
+      }
+    },
+    {
+      "id": "787e56c6-fcdb-4568-9e06-e864a5c73b7d",
+      "name": "Loop Over Papers",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1800,
+        200
+      ],
+      "parameters": {
+        "batchSize": 1
+      }
+    },
+    {
+      "id": "3f56e32a-7583-443f-bb9b-2f0259e532cf",
+      "name": "Wait Before Re-poll",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1400,
+        480
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 8,
+        "unit": "seconds"
+      },
+      "webhookId": "b2107098-816c-4e5a-812c-fc0d1ef75c96"
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Read PDFs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read PDFs": {
+      "main": [
+        [
+          {
+            "node": "Build MinerU Batch Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build MinerU Batch Request": {
+      "main": [
+        [
+          {
+            "node": "MinerU Submit Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MinerU Submit Batch": {
+      "main": [
+        [
+          {
+            "node": "Pair PDFs With Upload URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pair PDFs With Upload URLs": {
+      "main": [
+        [
+          {
+            "node": "Upload PDF To MinerU",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload PDF To MinerU": {
+      "main": [
+        [
+          {
+            "node": "Get MinerU Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get MinerU Results": {
+      "main": [
+        [
+          {
+            "node": "All Papers Parsed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "All Papers Parsed?": {
+      "main": [
+        [
+          {
+            "node": "Split Papers",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Before Re-poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Papers": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Papers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read All Paper MDs": {
+      "main": [
+        [
+          {
+            "node": "Combine Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Report": {
+      "main": [
+        [
+          {
+            "node": "Report MD To HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report MD To HTML": {
+      "main": [
+        [
+          {
+            "node": "Report HTML To File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report HTML To File": {
+      "main": [
+        [
+          {
+            "node": "Send To QQ Mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Result Zip": {
+      "main": [
+        [
+          {
+            "node": "Decompress Zip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decompress Zip": {
+      "main": [
+        [
+          {
+            "node": "Parse MinerU Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse MinerU Output": {
+      "main": [
+        [
+          {
+            "node": "Analyze Paper (DeepSeek + Qwen-VL)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Paper (DeepSeek + Qwen-VL)": {
+      "main": [
+        [
+          {
+            "node": "Assemble Paper Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Paper Markdown": {
+      "main": [
+        [
+          {
+            "node": "Paper MD To File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Paper MD To File": {
+      "main": [
+        [
+          {
+            "node": "Write Paper MD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Paper MD": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Papers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Papers": {
+      "main": [
+        [
+          {
+            "node": "Read All Paper MDs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Result Zip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Before Re-poll": {
+      "main": [
+        [
+          {
+            "node": "Get MinerU Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "staticData": null,
+  "activeVersionId": null,
+  "versionCounter": 5,
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

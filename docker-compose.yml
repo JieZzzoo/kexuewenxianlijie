@@ -1,0 +1,28 @@
+# 自包含、可移植的 n8n 配置 —— clone 仓库后在仓库根目录 `docker compose up -d` 即可。
+# 已内置本工作流所需的全部设置：本地文件读写、$env 读取、papers/out 目录挂载。
+#
+# 注意：如果你本机已经在跑别的 n8n（占用 5678 端口或容器名 n8n），
+#       请改下面的 container_name / ports 后再启动。
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.15.0
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    env_file:
+      - ./.env                          # 注入 MINERU_TOKEN / DEEPSEEK_API_KEY / QQ_* 给节点的 {{ $env.X }}
+    environment:
+      - TZ=Asia/Shanghai
+      - GENERIC_TIMEZONE=Asia/Shanghai
+      - N8N_SECURE_COOKIE=false          # 允许通过 http://localhost 访问
+      - N8N_RUNNERS_ENABLED=true
+      - N8N_RESTRICT_FILE_ACCESS_TO=/data # 允许读写 /data 下的 papers、out（多个目录用 ; 分隔）
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false # 允许节点表达式读取 $env（密钥从这里读）
+    volumes:
+      - n8n_data:/home/node/.n8n         # n8n 数据（工作流、凭据、加密 key）持久化
+      - ./papers:/data/papers            # 放精选 PDF 的目录（host ./papers → 容器 /data/papers）
+      - ./out:/data/out                  # 输出目录（逐篇 md、最终报告 html）
+
+volumes:
+  n8n_data:

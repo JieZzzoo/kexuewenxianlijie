@@ -1,0 +1,186 @@
+{
+  "updatedAt": "2026-05-30T06:38:13.958Z",
+  "createdAt": "2026-05-30T06:38:13.958Z",
+  "name": "文献报告-仅发送(测试)",
+  "description": "读取 /data/out 下已生成的 paper md，合并为完整报告，转 HTML，发送到 QQ 邮箱。用于快速验证报告组装+邮件发送（不重跑 MinerU/DeepSeek）。",
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "aa33a56c-91c8-42ee-a670-fde1620d2d1f",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "id": "2ab9322f-38ea-417d-8180-2f809ea425d4",
+      "name": "Read All Paper MDs",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        300
+      ],
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "/data/out/*.md"
+      }
+    },
+    {
+      "id": "488bfb89-0b70-4526-8c38-63bc5dbc8dc6",
+      "name": "Combine Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const NL = String.fromCharCode(10);\nconst items = $input.all();\nconst parts = [];\nfor (let i = 0; i < items.length; i++) {\n  const bin = items[i].binary || {};\n  const key = Object.keys(bin)[0];\n  let txt = \"\";\n  if (key) {\n    try { txt = (await this.helpers.getBinaryDataBuffer(i, key)).toString(\"utf8\"); }\n    catch (e) { txt = Buffer.from(bin[key].data || \"\", \"base64\").toString(\"utf8\"); }\n  }\n  const name = (bin[key] && bin[key].fileName) || (\"paper-\" + i);\n  parts.push({ name: name, txt: txt });\n}\nparts.sort(function(a, b){ return a.name.localeCompare(b.name); });\nconst sep = NL + NL + \"---\" + NL + NL;\nconst header = \"# 文献精读报告\" + NL + NL + \"生成时间：\" + $now.toISO() + NL + NL + \"共 \" + parts.length + \" 篇文献\" + sep;\nconst reportMarkdown = header + parts.map(function(p){ return p.txt; }).join(sep);\nreturn [{ json: { reportMarkdown: reportMarkdown, paperCount: parts.length } }];"
+      }
+    },
+    {
+      "id": "cffc9c56-57de-4434-b170-ad64eadfa788",
+      "name": "Report MD To HTML",
+      "type": "n8n-nodes-base.markdown",
+      "typeVersion": 1,
+      "position": [
+        600,
+        300
+      ],
+      "parameters": {
+        "mode": "markdownToHtml",
+        "markdown": "={{ $json.reportMarkdown }}",
+        "destinationKey": "htmlReport",
+        "options": {
+          "completeHTMLDocument": true,
+          "tables": true,
+          "simpleLineBreaks": true
+        }
+      }
+    },
+    {
+      "id": "94bfefbd-e513-4e15-88bf-b66d2d9b56be",
+      "name": "Report HTML To File",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        300
+      ],
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "htmlReport",
+        "binaryPropertyName": "data",
+        "options": {
+          "dataIsBase64": false,
+          "encoding": "utf8",
+          "fileName": "文献精读报告.html",
+          "mimeType": "text/html"
+        }
+      }
+    },
+    {
+      "id": "75e1aaa6-993e-42b6-8734-d04040c42ac9",
+      "name": "Send To QQ Mail",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1000,
+        300
+      ],
+      "parameters": {
+        "operation": "send",
+        "fromEmail": "={{ $env.QQ_SMTP_USER }}",
+        "toEmail": "={{ $env.QQ_MAIL_TO || $env.QQ_SMTP_USER }}",
+        "subject": "=文献精读报告 {{ $now.toFormat(\"yyyy-MM-dd HH:mm\") }}",
+        "emailFormat": "html",
+        "html": "={{ $(\"Report MD To HTML\").item.json.htmlReport }}",
+        "options": {
+          "attachments": "data",
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "smtp": {
+          "id": "qqsmtpCRED000001",
+          "name": "QQ SMTP"
+        }
+      },
+      "webhookId": "7517099e-e6c0-4944-bb9b-ac5d568918bb"
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Read All Paper MDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read All Paper MDs": {
+      "main": [
+        [
+          {
+            "node": "Combine Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Report": {
+      "main": [
+        [
+          {
+            "node": "Report MD To HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report MD To HTML": {
+      "main": [
+        [
+          {
+            "node": "Report HTML To File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report HTML To File": {
+      "main": [
+        [
+          {
+            "node": "Send To QQ Mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "staticData": null,
+  "activeVersionId": null,
+  "versionCounter": 1,
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}
