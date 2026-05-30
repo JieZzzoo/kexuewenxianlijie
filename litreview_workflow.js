@@ -164,15 +164,8 @@ const readPaperMds = node({
 const combineReport = node({
   type: 'n8n-nodes-base.code',
   version: 2,
-  config: { name: 'Combine Report', parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "const NL = String.fromCharCode(10);\nconst items = $input.all();\nconst parts = [];\nfor (let i = 0; i < items.length; i++) {\n  const bin = items[i].binary || {};\n  const key = Object.keys(bin)[0];\n  let txt = \"\";\n  if (key) {\n    try { txt = (await this.helpers.getBinaryDataBuffer(i, key)).toString(\"utf8\"); }\n    catch (e) { txt = Buffer.from(bin[key].data || \"\", \"base64\").toString(\"utf8\"); }\n  }\n  const name = (bin[key] && bin[key].fileName) || (\"paper-\" + i);\n  parts.push({ name: name, txt: txt });\n}\nparts.sort(function(a, b){ return a.name.localeCompare(b.name); });\nconst sep = NL + NL + \"---\" + NL + NL;\nconst header = \"# 文献精读报告\" + NL + NL + \"生成时间：\" + $now.toISO() + NL + NL + \"共 \" + parts.length + \" 篇文献\" + sep;\nconst reportMarkdown = header + parts.map(function(p){ return p.txt; }).join(sep);\nreturn [{ json: { reportMarkdown: reportMarkdown, paperCount: parts.length } }];" }, position: [2200, 400] },
-  output: [{ reportMarkdown: '# 文献精读报告', paperCount: 3 }],
-});
-
-const mdToHtml = node({
-  type: 'n8n-nodes-base.markdown',
-  version: 1,
-  config: { name: 'Report MD To HTML', parameters: { mode: 'markdownToHtml', markdown: expr('{{ $json.reportMarkdown }}'), destinationKey: 'htmlReport', options: { completeHTMLDocument: true, tables: true, simpleLineBreaks: true } }, position: [2400, 400] },
-  output: [{ reportMarkdown: '# 文献精读报告', htmlReport: '<html><body></body></html>' }],
+  config: { name: 'Combine Report', parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "const NL = String.fromCharCode(10);\nconst items = $input.all();\nconst parts = [];\nfor (let i = 0; i < items.length; i++) {\n  const bin = items[i].binary || {};\n  const key = Object.keys(bin)[0];\n  let txt = \"\";\n  if (key) {\n    try { txt = (await this.helpers.getBinaryDataBuffer(i, key)).toString(\"utf8\"); }\n    catch (e) { txt = Buffer.from(bin[key].data || \"\", \"base64\").toString(\"utf8\"); }\n  }\n  const name = (bin[key] && bin[key].fileName) || (\"paper-\" + i);\n  parts.push({ name: name, txt: txt });\n}\nparts.sort(function(a, b){ return a.name.localeCompare(b.name); });\nconst sep = NL + NL + \"---\" + NL + NL;\nconst header = \"# 文献精读报告\" + NL + NL + \"生成时间：\" + $now.toISO() + NL + NL + \"共 \" + parts.length + \" 篇文献\" + sep;\nconst reportMarkdown = header + parts.map(function(p){ return p.txt; }).join(sep);\n\nfunction esc(s){ return s.split(\"&\").join(\"&amp;\").split(\"<\").join(\"&lt;\").split(\">\").join(\"&gt;\"); }\nfunction boldify(s){ const a = s.split(\"**\"); let r = \"\"; for (let i = 0; i < a.length; i++){ r += (i % 2 === 1) ? (\"<strong>\" + a[i] + \"</strong>\") : a[i]; } return r; }\nconst lines = reportMarkdown.split(NL);\nconst htmlParts = []; let inList = false;\nfunction closeList(){ if (inList) { htmlParts.push(\"</ul>\"); inList = false; } }\nfor (let i = 0; i < lines.length; i++) {\n  const ln = lines[i];\n  const t = ln.trim();\n  if (t.length === 0) { closeList(); continue; }\n  if (ln.charAt(0) === \"<\") { closeList(); htmlParts.push(ln); continue; }\n  if (t === \"---\") { closeList(); htmlParts.push(\"<hr>\"); continue; }\n  if (ln.indexOf(\"### \") === 0) { closeList(); htmlParts.push(\"<h3>\" + boldify(esc(ln.slice(4))) + \"</h3>\"); continue; }\n  if (ln.indexOf(\"## \") === 0) { closeList(); htmlParts.push(\"<h2>\" + boldify(esc(ln.slice(3))) + \"</h2>\"); continue; }\n  if (ln.indexOf(\"# \") === 0) { closeList(); htmlParts.push(\"<h1>\" + boldify(esc(ln.slice(2))) + \"</h1>\"); continue; }\n  if (ln.indexOf(\"- \") === 0 || ln.indexOf(\"* \") === 0) { if (!inList) { htmlParts.push(\"<ul>\"); inList = true; } htmlParts.push(\"<li>\" + boldify(esc(ln.slice(2))) + \"</li>\"); continue; }\n  closeList(); htmlParts.push(\"<p>\" + boldify(esc(ln)) + \"</p>\");\n}\ncloseList();\nconst style = \"<style>body{font-family:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;max-width:900px;margin:24px auto;padding:0 16px;line-height:1.7;color:#222}img{max-width:100%;height:auto;display:block;margin:10px 0}h1{font-size:24px}h2{font-size:20px;border-bottom:1px solid #eee;padding-bottom:4px}h3{font-size:16px;color:#0a58ca}hr{border:none;border-top:1px solid #ddd;margin:28px 0}</style>\";\nconst htmlReport = '<!doctype html><html><head><meta charset=\"utf-8\">' + style + '</head><body>' + htmlParts.join(NL) + '</body></html>';\nreturn [{ json: { reportMarkdown: reportMarkdown, htmlReport: htmlReport, paperCount: parts.length } }];" }, position: [2200, 400] },
+  output: [{ reportMarkdown: '# 文献精读报告', htmlReport: '<!doctype html><html><body></body></html>', paperCount: 3 }],
 });
 
 const htmlToFile = node({
@@ -193,7 +186,7 @@ const sendEmail = node({
       toEmail: expr('{{ $env.QQ_MAIL_TO || $env.QQ_SMTP_USER }}'),
       subject: expr('文献精读报告 {{ $now.toFormat("yyyy-MM-dd") }}'),
       emailFormat: 'html',
-      html: expr('{{ $("Report MD To HTML").item.json.htmlReport }}'),
+      html: expr('{{ $("Combine Report").item.json.htmlReport }}'),
       options: { attachments: 'data', appendAttribution: false },
     },
     credentials: { smtp: newCredential('QQ SMTP') },
@@ -223,7 +216,6 @@ export default workflow('lit-review-report', '科学文献精读报告')
           .to(nextBatch(loopPapers)))
         .onDone(readPaperMds
           .to(combineReport)
-          .to(mdToHtml)
           .to(htmlToFile)
           .to(sendEmail))))
     .onFalse(waitPoll.to(getResults)));

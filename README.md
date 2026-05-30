@@ -141,7 +141,7 @@ QQ邮箱网页版 → **设置 → 账号与安全 → 安全管理** → 开启
 
 ---
 
-## 🧩 工作流节点说明（23 节点）
+## 🧩 工作流节点说明（22 节点）
 
 | 阶段 | 关键节点 |
 |---|---|
@@ -149,7 +149,7 @@ QQ邮箱网页版 → **设置 → 账号与安全 → 安全管理** → 开启
 | 解析 | `Build MinerU Batch Request` → `MinerU Submit Batch` → `Pair PDFs With Upload URLs` → `Upload PDF To MinerU`(PUT) → `Get MinerU Results`(轮询) → `All Papers Parsed?`(IF) ↺ `Wait Before Re-poll` |
 | 逐篇 | `Split Papers` → `Loop Over Papers` → `Download Result Zip` → `Decompress Zip` → `Parse MinerU Output` |
 | 分析 | `Analyze Paper (DeepSeek + Qwen-VL)`（正文/表走 DeepSeek、每图走 Qwen-VL，全部并发）→ `Assemble Paper Markdown` → `Paper MD To File` → `Write Paper MD` |
-| 汇总 | `Read All Paper MDs` → `Combine Report` → `Report MD To HTML` → `Report HTML To File` → `Send To QQ Mail` |
+| 汇总 | `Read All Paper MDs` → `Combine Report`（拼报告并轻量转 HTML，规避大 base64 OOM）→ `Report HTML To File` → `Send To QQ Mail` |
 
 源码也提供了 `litreview_workflow.js`（[n8n Workflow SDK](https://docs.n8n.io) 形式），供想用 n8n 原生 MCP 重新生成/二次开发的人参考。
 

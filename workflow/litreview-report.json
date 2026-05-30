@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-05-30T08:28:10.881Z",
+  "updatedAt": "2026-05-30T09:03:44.222Z",
   "createdAt": "2026-05-30T05:28:36.956Z",
   "name": "科学文献精读报告",
   "description": "读取 /data/papers 下的 PDF，经 MinerU 云端解析出正文/图/表，用 DeepSeek V4 Pro 逐篇做正文+图+表分析，组装成\"图在上分析在下\"的 Markdown（每篇存 /data/out），合并为完整报告并以自包含 HTML 附件发送到 QQ 邮箱。",
@@ -203,27 +203,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const NL = String.fromCharCode(10);\nconst items = $input.all();\nconst parts = [];\nfor (let i = 0; i < items.length; i++) {\n  const bin = items[i].binary || {};\n  const key = Object.keys(bin)[0];\n  let txt = \"\";\n  if (key) {\n    try { txt = (await this.helpers.getBinaryDataBuffer(i, key)).toString(\"utf8\"); }\n    catch (e) { txt = Buffer.from(bin[key].data || \"\", \"base64\").toString(\"utf8\"); }\n  }\n  const name = (bin[key] && bin[key].fileName) || (\"paper-\" + i);\n  parts.push({ name: name, txt: txt });\n}\nparts.sort(function(a, b){ return a.name.localeCompare(b.name); });\nconst sep = NL + NL + \"---\" + NL + NL;\nconst header = \"# 文献精读报告\" + NL + NL + \"生成时间：\" + $now.toISO() + NL + NL + \"共 \" + parts.length + \" 篇文献\" + sep;\nconst reportMarkdown = header + parts.map(function(p){ return p.txt; }).join(sep);\nreturn [{ json: { reportMarkdown: reportMarkdown, paperCount: parts.length } }];"
-      }
-    },
-    {
-      "id": "cdb50bbf-089b-45d0-8fcc-8121fd939720",
-      "name": "Report MD To HTML",
-      "type": "n8n-nodes-base.markdown",
-      "typeVersion": 1,
-      "position": [
-        2400,
-        400
-      ],
-      "parameters": {
-        "mode": "markdownToHtml",
-        "markdown": "={{ $json.reportMarkdown }}",
-        "destinationKey": "htmlReport",
-        "options": {
-          "completeHTMLDocument": true,
-          "tables": true,
-          "simpleLineBreaks": true
-        }
+        "jsCode": "const NL = String.fromCharCode(10);\nconst items = $input.all();\nconst parts = [];\nfor (let i = 0; i < items.length; i++) {\n  const bin = items[i].binary || {};\n  const key = Object.keys(bin)[0];\n  let txt = \"\";\n  if (key) {\n    try { txt = (await this.helpers.getBinaryDataBuffer(i, key)).toString(\"utf8\"); }\n    catch (e) { txt = Buffer.from(bin[key].data || \"\", \"base64\").toString(\"utf8\"); }\n  }\n  const name = (bin[key] && bin[key].fileName) || (\"paper-\" + i);\n  parts.push({ name: name, txt: txt });\n}\nparts.sort(function(a, b){ return a.name.localeCompare(b.name); });\nconst sep = NL + NL + \"---\" + NL + NL;\nconst header = \"# 文献精读报告\" + NL + NL + \"生成时间：\" + $now.toISO() + NL + NL + \"共 \" + parts.length + \" 篇文献\" + sep;\nconst reportMarkdown = header + parts.map(function(p){ return p.txt; }).join(sep);\n\nfunction esc(s){ return s.split(\"&\").join(\"&amp;\").split(\"<\").join(\"&lt;\").split(\">\").join(\"&gt;\"); }\nfunction boldify(s){ const a = s.split(\"**\"); let r = \"\"; for (let i = 0; i < a.length; i++){ r += (i % 2 === 1) ? (\"<strong>\" + a[i] + \"</strong>\") : a[i]; } return r; }\nconst lines = reportMarkdown.split(NL);\nconst htmlParts = []; let inList = false;\nfunction closeList(){ if (inList) { htmlParts.push(\"</ul>\"); inList = false; } }\nfor (let i = 0; i < lines.length; i++) {\n  const ln = lines[i];\n  const t = ln.trim();\n  if (t.length === 0) { closeList(); continue; }\n  if (ln.charAt(0) === \"<\") { closeList(); htmlParts.push(ln); continue; }\n  if (t === \"---\") { closeList(); htmlParts.push(\"<hr>\"); continue; }\n  if (ln.indexOf(\"### \") === 0) { closeList(); htmlParts.push(\"<h3>\" + boldify(esc(ln.slice(4))) + \"</h3>\"); continue; }\n  if (ln.indexOf(\"## \") === 0) { closeList(); htmlParts.push(\"<h2>\" + boldify(esc(ln.slice(3))) + \"</h2>\"); continue; }\n  if (ln.indexOf(\"# \") === 0) { closeList(); htmlParts.push(\"<h1>\" + boldify(esc(ln.slice(2))) + \"</h1>\"); continue; }\n  if (ln.indexOf(\"- \") === 0 || ln.indexOf(\"* \") === 0) { if (!inList) { htmlParts.push(\"<ul>\"); inList = true; } htmlParts.push(\"<li>\" + boldify(esc(ln.slice(2))) + \"</li>\"); continue; }\n  closeList(); htmlParts.push(\"<p>\" + boldify(esc(ln)) + \"</p>\");\n}\ncloseList();\nconst style = \"<style>body{font-family:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;max-width:900px;margin:24px auto;padding:0 16px;line-height:1.7;color:#222}img{max-width:100%;height:auto;display:block;margin:10px 0}h1{font-size:24px}h2{font-size:20px;border-bottom:1px solid #eee;padding-bottom:4px}h3{font-size:16px;color:#0a58ca}hr{border:none;border-top:1px solid #ddd;margin:28px 0}</style>\";\nconst htmlReport = '<!doctype html><html><head><meta charset=\"utf-8\">' + style + '</head><body>' + htmlParts.join(NL) + '</body></html>';\nreturn [{ json: { reportMarkdown: reportMarkdown, htmlReport: htmlReport, paperCount: parts.length } }];"
       }
     },
     {
@@ -262,7 +242,7 @@
         "toEmail": "={{ $env.QQ_MAIL_TO || $env.QQ_SMTP_USER }}",
         "subject": "=文献精读报告 {{ $now.toFormat(\"yyyy-MM-dd\") }}",
         "emailFormat": "html",
-        "html": "={{ $(\"Report MD To HTML\").item.json.htmlReport }}",
+        "html": "={{ $(\"Combine Report\").item.json.htmlReport }}",
         "options": {
           "attachments": "data",
           "appendAttribution": false
@@ -274,7 +254,7 @@
           "name": "QQ SMTP"
         }
       },
-      "webhookId": "c13dcb01-ea2f-4f33-b1fa-8ed7d53cd910"
+      "webhookId": "5e8a69bd-d28d-4c89-afbb-0b90f905ec3d"
     },
     {
       "id": "8d76842e-4dfa-4ded-b281-c3d122f530f3",
@@ -421,7 +401,7 @@
         "amount": 8,
         "unit": "seconds"
       },
-      "webhookId": "b2107098-816c-4e5a-812c-fc0d1ef75c96"
+      "webhookId": "7237b04c-fd70-495c-b197-72fbe9705c69"
     }
   ],
   "connections": {
@@ -543,17 +523,6 @@
       ]
     },
     "Combine Report": {
-      "main": [
-        [
-          {
-            "node": "Report MD To HTML",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Report MD To HTML": {
       "main": [
         [
           {
@@ -688,7 +657,7 @@
   },
   "staticData": null,
   "activeVersionId": null,
-  "versionCounter": 5,
+  "versionCounter": 6,
   "versionMetadata": {
     "name": null,
     "description": null
