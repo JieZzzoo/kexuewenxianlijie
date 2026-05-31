@@ -44,7 +44,7 @@
           ]
         }
       },
-      "webhookId": "e328fe3a-5572-4eee-bfbd-339b3c9f8ec4"
+      "webhookId": "ef4051fe-fa59-4e4a-949b-87d8d5927648"
     },
     {
       "id": "bc40967e-c22e-4a4a-86e1-e0e4662291aa",
@@ -174,7 +174,7 @@
           ]
         }
       },
-      "webhookId": "f256ab1a-ca02-40e3-a4d0-942265fbe495"
+      "webhookId": "05266db8-4b17-457c-b26e-e8914e1d1f10"
     },
     {
       "id": "c4c7f3b2-46a1-4441-9094-712d92d80968",
@@ -417,6 +417,38 @@
       }
     },
     {
+      "id": "e0aebcc2-6447-468f-8136-4f002d2ad51d",
+      "name": "Write Report HTML",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        4500,
+        400
+      ],
+      "parameters": {
+        "operation": "write",
+        "fileName": "/data/out/文献精读报告.html",
+        "dataPropertyName": "data"
+      }
+    },
+    {
+      "id": "67d6a3d0-8ee6-4b86-aa33-f63756df9c56",
+      "name": "Compress Report",
+      "type": "n8n-nodes-base.compression",
+      "typeVersion": 1.1,
+      "position": [
+        4700,
+        400
+      ],
+      "parameters": {
+        "operation": "compress",
+        "binaryPropertyName": "data",
+        "outputFormat": "zip",
+        "fileName": "文献精读报告.zip",
+        "binaryPropertyOutput": "data"
+      }
+    },
+    {
       "id": "469d3220-0696-4454-ac84-cbeb3f20d95b",
       "name": "Send To QQ Mail",
       "type": "n8n-nodes-base.emailSend",
@@ -431,7 +463,7 @@
         "toEmail": "={{ $env.QQ_MAIL_TO || $env.QQ_SMTP_USER }}",
         "subject": "=文献精读报告 {{ $now.toFormat(\"yyyy-MM-dd\") }}",
         "emailFormat": "html",
-        "html": "=<p>文献精读报告已生成，共 {{ $json.paperCount }} 篇文献。</p><p>请打开附件 <b>文献精读报告.html</b>（用浏览器查看，图文并茂、自包含）。</p>",
+        "html": "=<p>文献精读报告已生成，共 {{ $(\"Combine Report\").item.json.paperCount }} 篇文献。</p><p>附件为压缩包 <b>文献精读报告.zip</b>，解压后用浏览器打开（图文并茂、自包含）；完整文件也在本机 out/文献精读报告.html。</p>",
         "options": {
           "attachments": "data",
           "appendAttribution": false
@@ -443,7 +475,7 @@
           "name": "QQ SMTP"
         }
       },
-      "webhookId": "18439b2b-6b2e-461e-9fc0-f451ea0da7fb"
+      "webhookId": "fed66f27-89a5-48f1-92b8-6fbad3c90aac"
     },
     {
       "id": "378273c4-52f2-4281-99c6-ac759613fa50",
@@ -591,7 +623,7 @@
         "amount": 8,
         "unit": "seconds"
       },
-      "webhookId": "0e879e4f-471f-4e43-9b55-0a30cafa0232"
+      "webhookId": "4478cd4b-1ce6-4419-a915-86f986d3382a"
     },
     {
       "id": "bd718202-98f5-4b4e-af17-2a5d718d2cfb",
@@ -822,6 +854,28 @@
       ]
     },
     "Combine Report": {
+      "main": [
+        [
+          {
+            "node": "Write Report HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Report HTML": {
+      "main": [
+        [
+          {
+            "node": "Compress Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compress Report": {
       "main": [
         [
           {

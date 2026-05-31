@@ -213,6 +213,20 @@ const combineReport = node({
   output: [{ paperCount: 3 }],
 });
 
+const writeReportHtml = node({
+  type: 'n8n-nodes-base.readWriteFile',
+  version: 1.1,
+  config: { name: 'Write Report HTML', parameters: { operation: 'write', fileName: '/data/out/文献精读报告.html', dataPropertyName: 'data' }, position: [4500, 400] },
+  output: [{}],
+});
+
+const compressReport = node({
+  type: 'n8n-nodes-base.compression',
+  version: 1.1,
+  config: { name: 'Compress Report', parameters: { operation: 'compress', binaryPropertyName: 'data', outputFormat: 'zip', fileName: '文献精读报告.zip', binaryPropertyOutput: 'data' }, position: [4700, 400] },
+  output: [{}],
+});
+
 const sendEmail = node({
   type: 'n8n-nodes-base.emailSend',
   version: 2.1,
@@ -224,7 +238,7 @@ const sendEmail = node({
       toEmail: expr('{{ $env.QQ_MAIL_TO || $env.QQ_SMTP_USER }}'),
       subject: expr('文献精读报告 {{ $now.toFormat("yyyy-MM-dd") }}'),
       emailFormat: 'html',
-      html: expr('<p>文献精读报告已生成，共 {{ $json.paperCount }} 篇文献。</p><p>请打开附件 <b>文献精读报告.html</b>（用浏览器查看，图文并茂、自包含）。</p>'),
+      html: expr('<p>文献精读报告已生成，共 {{ $(\"Combine Report\").item.json.paperCount }} 篇文献。</p><p>附件为压缩包 <b>文献精读报告.zip</b>，解压后用浏览器打开（图文并茂、自包含）；完整文件也在本机 out/文献精读报告.html。</p>'),
       options: { attachments: 'data', appendAttribution: false },
     },
     credentials: { smtp: newCredential('QQ SMTP') },
@@ -263,6 +277,8 @@ export default workflow('litreview-all', '科学文献检索·精读一体')
           .to(nextBatch(loopPapers)))
         .onDone(readPaperMds
           .to(combineReport)
+          .to(writeReportHtml)
+          .to(compressReport)
           .to(sendEmail))))
     .onFalse(waitPoll.to(getResults)))
   .add(manualStart)
