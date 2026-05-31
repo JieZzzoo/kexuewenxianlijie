@@ -1,41 +1,248 @@
 {
-  "updatedAt": "2026-05-30T09:03:44.222Z",
-  "createdAt": "2026-05-30T05:28:36.956Z",
-  "name": "科学文献精读报告",
-  "description": "读取 /data/papers 下的 PDF，经 MinerU 云端解析出正文/图/表，用 DeepSeek V4 Pro 逐篇做正文+图+表分析，组装成\"图在上分析在下\"的 Markdown（每篇存 /data/out），合并为完整报告并以自包含 HTML 附件发送到 QQ 邮箱。",
-  "isArchived": false,
+  "name": "科学文献检索·精读一体",
   "nodes": [
     {
-      "id": "453ed1ad-5b79-4cd6-8fad-519b01cbcec0",
-      "name": "Start",
-      "type": "n8n-nodes-base.manualTrigger",
-      "typeVersion": 1,
+      "id": "b5db76e8-a59f-478e-9278-e78a52ab0923",
+      "name": "输入问题",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
       "position": [
-        0,
+        180,
         300
-      ]
+      ],
+      "parameters": {
+        "formTitle": "科学文献检索",
+        "formDescription": "输入一个科研问题，系统自动检索并下载开放获取的全文 PDF，供后续精读。",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "research_question",
+              "fieldType": "textarea",
+              "placeholder": "例：AI 如何辅助靶向治疗蛋白质结构设计与功能优化？",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "domain",
+              "fieldType": "text",
+              "placeholder": "protein design, protein language model, diffusion model"
+            },
+            {
+              "fieldLabel": "max_papers",
+              "fieldType": "number",
+              "placeholder": "8"
+            },
+            {
+              "fieldLabel": "year_from",
+              "fieldType": "number",
+              "placeholder": "2018"
+            },
+            {
+              "fieldLabel": "year_to",
+              "fieldType": "number",
+              "placeholder": "2026"
+            }
+          ]
+        }
+      },
+      "webhookId": "0e838836-54ee-4e02-96eb-b01f31391a17"
     },
     {
-      "id": "bdf4ec6c-e9c3-450f-b3be-a2f6e693b20a",
+      "id": "bc40967e-c22e-4a4a-86e1-e0e4662291aa",
+      "name": "生成检索式(DeepSeek)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        360,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "\n// Turn the user's question into an OpenAlex keyword query via DeepSeek (falls back to raw input).\nconst form = $input.first().json;\nconst question = form.research_question || form.question || '';\nconst domain = form.domain || '';\nconst maxPapers = parseInt(form.max_papers, 10) || 8;\nconst yearFrom = parseInt(form.year_from, 10) || 2018;\nconst yearTo = parseInt(form.year_to, 10) || 2026;\nconst key = $env.DEEPSEEK_API_KEY;\nlet query = '';\ntry {\n  const r = await this.helpers.httpRequest({ method:'POST', url:'https://api.deepseek.com/chat/completions', headers:{ Authorization:'Bearer '+key, 'Content-Type':'application/json' }, body:{ model:'deepseek-v4-pro', messages:[{ role:'system', content:'You convert a research question into a concise English keyword search query for an academic search engine (OpenAlex). Output ONLY a JSON object {\\\"query\\\":\\\"...\\\"} containing 3-8 space-separated key terms. No boolean operators, no quotes inside, no explanation.' },{ role:'user', content:'Research question: ' + question + '\\nDomain hints: ' + domain }], response_format:{ type:'json_object' }, temperature:0.2, max_tokens:3000 }, json:true });\n  const c = JSON.parse(r.choices[0].message.content);\n  query = String(c.query || '').trim();\n} catch (e) {}\nif (!query) query = String(domain || question).slice(0, 200);\nreturn [{ json: { query: query, question: question, domain: domain, max_papers: maxPapers, year_from: yearFrom, year_to: yearTo } }];\n"
+      }
+    },
+    {
+      "id": "37ac77ca-3b3e-4dbe-a407-33e31424e21e",
+      "name": "Search OpenAlex",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        540,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.openalex.org/works",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "search",
+              "value": "={{ $json.query }}"
+            },
+            {
+              "name": "per-page",
+              "value": "={{ $json.max_papers }}"
+            },
+            {
+              "name": "filter",
+              "value": "=open_access.is_oa:true,from_publication_date:{{ $json.year_from }}-01-01,to_publication_date:{{ $json.year_to }}-12-31"
+            },
+            {
+              "name": "mailto",
+              "value": "1736672988@qq.com"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "f479c79e-3950-4e8e-a1c7-f95d38094b1f",
+      "name": "Standardize + Candidates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "\nconst resp = $input.first().json;\nconst works = (resp && resp.results) || [];\nfunction reconstructAbstract(inv){\n  if(!inv || typeof inv !== 'object') return '';\n  const w = [];\n  for(const k of Object.keys(inv)){ const pos = inv[k]; if(Array.isArray(pos)){ for(let i=0;i<pos.length;i++) w.push([pos[i], k]); } }\n  return w.sort(function(a,b){ return a[0]-b[0]; }).map(function(x){ return x[1]; }).join(' ');\n}\nfunction sanitize(s){ return String(s||'').replace(/[\\\\/:*?\"<>|\\n\\r\\t]+/g,'_').replace(/\\s+/g,'_').replace(/_+/g,'_').replace(/^_+|_+$/g,'').slice(0,120); }\nfunction norm(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); }\nconst out = [];\nconst usedNames = {};\nconst seenPapers = {};\nfor(let i=0;i<works.length;i++){\n  const w = works[i];\n  const doi = (w.doi || '').replace('https://doi.org/','').toLowerCase();\n  const title = w.display_name || w.title || ('paper-'+(i+1));\n  const pkey = doi || norm(title);\n  if(pkey && seenPapers[pkey]) continue;\n  if(pkey) seenPapers[pkey] = 1;\n  const cands = [];\n  let arxivId = '';\n  const m = /arxiv\\.(\\d{4}\\.\\d{4,5})/i.exec(doi);\n  if(m) arxivId = m[1];\n  if(!arxivId){ const ax = (w.ids && w.ids.arxiv) || ''; const m2 = /(\\d{4}\\.\\d{4,5})/.exec(ax); if(m2) arxivId = m2[1]; }\n  if(arxivId) cands.push('https://arxiv.org/pdf/' + arxivId);\n  const best = w.best_oa_location || {};\n  if(best.pdf_url) cands.push(best.pdf_url);\n  (w.locations || []).forEach(function(l){ if(l && l.pdf_url) cands.push(l.pdf_url); });\n  const oa = w.open_access || {};\n  if(oa.oa_url) cands.push(oa.oa_url);\n  const uniq = []; const seen = {};\n  cands.forEach(function(u){ if(u && !seen[u]){ seen[u]=1; uniq.push(u); } });\n  const pmcid = (w.ids && w.ids.pmcid) ? String(w.ids.pmcid).split('/').pop() : '';\n  let base = sanitize(title) || ('paper-'+(i+1));\n  let fn = base + '.pdf'; let n = 2;\n  while(usedNames[fn]){ fn = base + '_' + n + '.pdf'; n++; }\n  usedNames[fn] = 1;\n  out.push({ json: {\n    pdfFileName: fn, title: title, doi: doi, pmcid: pmcid,\n    year: w.publication_year || '',\n    authors: (w.authorships || []).map(function(a){ return a.author && a.author.display_name; }).filter(Boolean).slice(0,8).join(', '),\n    abstract: reconstructAbstract(w.abstract_inverted_index),\n    candidateCount: uniq.length, candidates: uniq\n  }});\n}\nreturn out;\n"
+      }
+    },
+    {
+      "id": "83c6c39a-dd30-4eae-884e-1728492220e1",
+      "name": "Enrich Candidates (Europe PMC)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "\nconst self = this;\nconst items = $input.all();\nasync function pmcidForDoi(doi){\n  try{\n    const r = await self.helpers.httpRequest({ method:'GET', url:'https://www.ebi.ac.uk/europepmc/webservices/rest/search', qs:{ query:'DOI:'+doi, format:'json', resultType:'lite', pageSize:1 }, json:true, timeout:20000 });\n    const res = (r && r.resultList && r.resultList.result) || [];\n    if(res.length){ const x = res[0]; const isOA = (x.isOpenAccess === 'Y') || (x.inEPMC === 'Y') || (x.inPMC === 'Y'); if(x.pmcid && isOA) return x.pmcid; }\n  }catch(e){}\n  return '';\n}\nasync function enrich(j){\n  const cands = (j.candidates || []).slice();\n  let pmcid = j.pmcid || '';\n  if(!pmcid && j.doi) pmcid = await pmcidForDoi(j.doi);\n  if(pmcid){ cands.unshift('https://www.ncbi.nlm.nih.gov/pmc/articles/' + pmcid + '/pdf/'); cands.unshift('https://europepmc.org/articles/' + pmcid + '?pdf=render'); }\n  const uniq = []; const seen = {};\n  cands.forEach(function(u){ if(u && !seen[u]){ seen[u]=1; uniq.push(u); } });\n  return Object.assign({}, j, { pmcid: pmcid, candidates: uniq, candidateCount: uniq.length });\n}\nconst out = await Promise.all(items.map(function(it){ return enrich(it.json); }));\nreturn out.map(function(j){ return { json: j }; });\n"
+      }
+    },
+    {
+      "id": "ba8ca95e-8a27-4c14-ab13-3e2724a1089c",
+      "name": "准备人工复核清单",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "\nconst items = $input.all();\nconst candidates = items.map(function(it, i){ return Object.assign({ review_id: i+1 }, it.json); });\nfunction short(s, n){ const t = String(s||'').replace(/\\s+/g,' ').trim(); return t.length>n ? t.slice(0,n)+'...' : (t || '(无摘要)'); }\nconst NL = String.fromCharCode(10);\nconst L = [];\nL.push('# 人工复核 — 候选文献（确认精选文献库）');\nL.push('');\nL.push('请在下方输入要**保留**的文献序号（逗号分隔，如 `1,3,5`；全部保留输入 `all`）。仅保留项会下载全文 PDF 并进入精读。');\nL.push('');\nL.push('标 `⚠ 无全文候选` 的多半下不到 PDF，建议跳过。');\nL.push('');\nfor(const p of candidates){\n  const tag = (p.candidateCount>0) ? ('候选PDF ' + p.candidateCount + ' 个') : '⚠ 无全文候选';\n  L.push('## ' + p.review_id + '. ' + (p.title || '(无标题)'));\n  L.push('- 年份：' + (p.year || '未知') + ' ｜ ' + tag + (p.pmcid ? (' ｜ PMC:' + p.pmcid) : ''));\n  L.push('- 作者：' + (p.authors || '未知'));\n  L.push('- 摘要：' + short(p.abstract, 320));\n  L.push('');\n}\nreturn [{ json: { reviewMarkdown: L.join(NL), reviewCandidates: candidates, total: candidates.length } }];\n"
+      }
+    },
+    {
+      "id": "878015cc-26fa-4ce2-ac24-5238b91bef6a",
+      "name": "等待人工复核",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1260,
+        300
+      ],
+      "parameters": {
+        "resume": "form",
+        "formTitle": "人工复核候选文献",
+        "formDescription": "={{ $json.reviewMarkdown }}",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "human_keep_ids",
+              "fieldType": "textarea",
+              "placeholder": "例：1,3,5 ；全部保留输入 all",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "human_review_note",
+              "fieldType": "textarea",
+              "placeholder": "可选：复核备注"
+            }
+          ]
+        }
+      },
+      "webhookId": "8174ac25-185d-412f-ae58-93c8b8126031"
+    },
+    {
+      "id": "c4c7f3b2-46a1-4441-9094-712d92d80968",
+      "name": "应用人工复核结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "\nconst waitOut = $input.first().json;\nconst prep = $('准备人工复核清单').first().json;\nconst candidates = (prep && prep.reviewCandidates) || [];\nfunction getField(o, name){ return o[name] || (o.data && o.data[name]) || (o.formData && o.formData[name]) || (o.body && o.body[name]) || ''; }\nconst raw = String(getField(waitOut, 'human_keep_ids') || '').trim();\nlet keep;\nif(!raw || raw.toLowerCase()==='all' || raw==='全部'){ keep = 'all'; }\nelse { const s = {}; raw.replace(/，/g, ',').split(',').forEach(function(x){ const n=parseInt(String(x).trim(),10); if(n>0) s[n]=1; }); keep = s; }\nlet sel = (keep==='all') ? candidates : candidates.filter(function(p){ return keep[Number(p.review_id)]; });\nsel = sel.filter(function(p){ return (p.candidates || []).length > 0; });\nreturn sel.map(function(p){ return { json: { pdfFileName: p.pdfFileName, title: p.title, doi: p.doi, candidates: p.candidates } }; });\n"
+      }
+    },
+    {
+      "id": "157de093-1d52-496a-9d5f-d26bc2b50e80",
+      "name": "Download & Validate PDF",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1620,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "\nconst UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36';\nconst self = this;\nconst items = $input.all();\nasync function fetchPdf(cands) {\n  const tried = [];\n  for (let i = 0; i < cands.length; i++) {\n    const url = cands[i];\n    try {\n      const resp = await self.helpers.httpRequest({ method: 'GET', url: url, encoding: 'arraybuffer', timeout: 45000, headers: { 'User-Agent': UA, 'Accept': 'application/pdf,*/*' } });\n      const buf = Buffer.from(resp);\n      if (buf.length > 1000 && buf.slice(0, 5).toString('latin1') === '%PDF-') return { buf: buf, url: url, tried: tried };\n      tried.push(url + ' -> not-pdf(' + buf.length + 'B)');\n    } catch (e) { tried.push(url + ' -> err:' + String((e && e.message) || e).slice(0, 70)); }\n  }\n  return { buf: null, url: null, tried: tried };\n}\nconst results = await Promise.all(items.map(function(it){ return fetchPdf((it.json && it.json.candidates) || []); }));\nconst out = [];\nfor (let k = 0; k < items.length; k++) {\n  const j = items[k].json;\n  const r = results[k];\n  if (r.buf) {\n    const bin = await self.helpers.prepareBinaryData(r.buf, j.pdfFileName, 'application/pdf');\n    out.push({ json: { pdfFileName: j.pdfFileName, title: j.title, ok: true, bytes: r.buf.length, sourceUrl: r.url, tried: r.tried }, binary: { data: bin } });\n  } else {\n    out.push({ json: { pdfFileName: j.pdfFileName, title: j.title, ok: false, bytes: 0, sourceUrl: null, tried: r.tried } });\n  }\n}\nreturn out.filter(function(o){ return o.json.ok; });\n"
+      }
+    },
+    {
+      "id": "384b7d64-9457-463a-b360-9cab3406f48a",
+      "name": "Write PDF To papers",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        1800,
+        300
+      ],
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/data/papers/{{ $json.pdfFileName }}",
+        "dataPropertyName": "data"
+      }
+    },
+    {
+      "id": "1d20d6d7-55b3-44a4-9d64-38d8ad7e3de5",
       "name": "Read PDFs",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        200,
+        2300,
         300
       ],
       "parameters": {
         "operation": "read",
         "fileSelector": "/data/papers/*.pdf"
-      }
+      },
+      "executeOnce": true
     },
     {
-      "id": "f1766446-c0c5-45fe-a1f5-7b2a131e4d06",
+      "id": "d7e1dcce-77bb-4565-a30f-01104bbbafc1",
       "name": "Build MinerU Batch Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        400,
+        2500,
         300
       ],
       "parameters": {
@@ -45,12 +252,12 @@
       }
     },
     {
-      "id": "c9982c86-396c-473a-9d10-2e408e47fd0c",
+      "id": "efb180c6-bf74-4c7c-923e-bb082fa00bd9",
       "name": "MinerU Submit Batch",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        600,
+        2700,
         300
       ],
       "parameters": {
@@ -74,15 +281,16 @@
         "contentType": "json",
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.requestBody) }}"
-      }
+      },
+      "retryOnFail": true
     },
     {
-      "id": "24a7cd6c-c830-4bb8-a78f-7a2632bfe2f3",
+      "id": "674946fc-16b9-4584-8a2e-97cd46cc49b1",
       "name": "Pair PDFs With Upload URLs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        800,
+        2900,
         300
       ],
       "parameters": {
@@ -92,12 +300,12 @@
       }
     },
     {
-      "id": "8d260007-ae3d-4714-9356-61d0cf140d07",
+      "id": "c9eaba6f-bc8e-486e-a223-3e88bd13046e",
       "name": "Upload PDF To MinerU",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1000,
+        3100,
         300
       ],
       "parameters": {
@@ -106,15 +314,16 @@
         "sendBody": true,
         "contentType": "binaryData",
         "inputDataFieldName": "data"
-      }
+      },
+      "retryOnFail": true
     },
     {
-      "id": "4a6b6d8a-b0cb-4fae-8e75-a57d59b40732",
+      "id": "188d5b80-830d-4198-8a98-a2ba14d498ed",
       "name": "Get MinerU Results",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1200,
+        3300,
         300
       ],
       "parameters": {
@@ -131,15 +340,16 @@
           ]
         }
       },
-      "executeOnce": true
+      "executeOnce": true,
+      "retryOnFail": true
     },
     {
-      "id": "2060bbe7-1c8a-4690-8801-7b44e40ee844",
+      "id": "b29ae8f3-407a-4ee6-b94c-7125c2c4f602",
       "name": "All Papers Parsed?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1400,
+        3500,
         300
       ],
       "parameters": {
@@ -164,12 +374,12 @@
       }
     },
     {
-      "id": "a20ab6b7-4487-4bd6-bdc4-7070373ad66d",
+      "id": "efeeb17a-55ec-4b94-a397-35e2f85fe018",
       "name": "Split Papers",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
       "position": [
-        1600,
+        3700,
         200
       ],
       "parameters": {
@@ -178,12 +388,12 @@
       }
     },
     {
-      "id": "29436711-9b54-4411-9cc9-76115347ef80",
+      "id": "0b5c5ff9-cfd2-483e-ac64-326ee1d0330b",
       "name": "Read All Paper MDs",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        2000,
+        4100,
         400
       ],
       "parameters": {
@@ -192,12 +402,12 @@
       }
     },
     {
-      "id": "9def016e-0f4b-44fd-99fc-658d3aea4817",
+      "id": "40c5c56c-3679-4274-9400-7fd7ba379df1",
       "name": "Combine Report",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2200,
+        4300,
         400
       ],
       "parameters": {
@@ -207,12 +417,12 @@
       }
     },
     {
-      "id": "9ab477e5-fc2b-4e5c-aefc-4216f5e48c03",
+      "id": "3f4c04b4-e110-4ca9-b705-654fe1fead3f",
       "name": "Report HTML To File",
       "type": "n8n-nodes-base.convertToFile",
       "typeVersion": 1.1,
       "position": [
-        2600,
+        4700,
         400
       ],
       "parameters": {
@@ -228,12 +438,12 @@
       }
     },
     {
-      "id": "720a91e2-d4b8-4e2b-ac48-2e6fb936d6c2",
+      "id": "469d3220-0696-4454-ac84-cbeb3f20d95b",
       "name": "Send To QQ Mail",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        2800,
+        4900,
         400
       ],
       "parameters": {
@@ -254,15 +464,15 @@
           "name": "QQ SMTP"
         }
       },
-      "webhookId": "5e8a69bd-d28d-4c89-afbb-0b90f905ec3d"
+      "webhookId": "cd43386b-5022-4e8f-b582-35dadb5d1029"
     },
     {
-      "id": "8d76842e-4dfa-4ded-b281-c3d122f530f3",
+      "id": "378273c4-52f2-4281-99c6-ac759613fa50",
       "name": "Download Result Zip",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        2000,
+        4100,
         100
       ],
       "parameters": {
@@ -276,15 +486,16 @@
             }
           }
         }
-      }
+      },
+      "retryOnFail": true
     },
     {
-      "id": "380ab867-bd50-4206-941d-6f63ced87ea3",
+      "id": "449deac4-b323-46d8-b109-f4a7cc598d07",
       "name": "Decompress Zip",
       "type": "n8n-nodes-base.compression",
       "typeVersion": 1.1,
       "position": [
-        2200,
+        4300,
         100
       ],
       "parameters": {
@@ -294,12 +505,12 @@
       }
     },
     {
-      "id": "40d09526-95e6-4100-a0d5-a0a662016ec6",
+      "id": "3cab17db-34b9-4645-8a08-0a530b4a2541",
       "name": "Parse MinerU Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2400,
+        4500,
         100
       ],
       "parameters": {
@@ -309,12 +520,12 @@
       }
     },
     {
-      "id": "d5aacb41-3390-4cd9-b602-4d099ed264b6",
+      "id": "75f2d0d2-b709-4c4f-8241-c73ae6841bba",
       "name": "Analyze Paper (DeepSeek + Qwen-VL)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2600,
+        4700,
         100
       ],
       "parameters": {
@@ -324,12 +535,12 @@
       }
     },
     {
-      "id": "0249a9f2-cf39-43fb-aece-fd813c212e69",
+      "id": "e92ec9b4-0455-4e4d-b05d-97f4a5675d80",
       "name": "Assemble Paper Markdown",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2800,
+        4900,
         100
       ],
       "parameters": {
@@ -339,12 +550,12 @@
       }
     },
     {
-      "id": "576df2a9-cb3a-4ba4-ad71-e05f9c1442aa",
+      "id": "0087b273-bacf-4bec-8fac-c1cf9614925c",
       "name": "Paper MD To File",
       "type": "n8n-nodes-base.convertToFile",
       "typeVersion": 1.1,
       "position": [
-        3000,
+        5100,
         100
       ],
       "parameters": {
@@ -360,12 +571,12 @@
       }
     },
     {
-      "id": "bcf15dd6-81bb-4dc8-a214-3f24c8fafee5",
+      "id": "e387abc0-a096-4d40-80c3-c4355c19f395",
       "name": "Write Paper MD",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        3200,
+        5300,
         100
       ],
       "parameters": {
@@ -375,12 +586,12 @@
       }
     },
     {
-      "id": "787e56c6-fcdb-4568-9e06-e864a5c73b7d",
+      "id": "c54ceb59-1908-4ea2-b1a0-b71e419828aa",
       "name": "Loop Over Papers",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        1800,
+        3900,
         200
       ],
       "parameters": {
@@ -388,12 +599,12 @@
       }
     },
     {
-      "id": "3f56e32a-7583-443f-bb9b-2f0259e532cf",
+      "id": "fd1000fa-d92e-4c08-ac5e-6fb50390e042",
       "name": "Wait Before Re-poll",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        1400,
+        3500,
         480
       ],
       "parameters": {
@@ -401,11 +612,120 @@
         "amount": 8,
         "unit": "seconds"
       },
-      "webhookId": "7237b04c-fd70-495c-b197-72fbe9705c69"
+      "webhookId": "4a455695-19e1-4aae-86e6-860cb8a54099"
+    },
+    {
+      "id": "bd718202-98f5-4b4e-af17-2a5d718d2cfb",
+      "name": "手动精读(papers已就绪)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        180,
+        560
+      ]
     }
   ],
   "connections": {
-    "Start": {
+    "输入问题": {
+      "main": [
+        [
+          {
+            "node": "生成检索式(DeepSeek)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "生成检索式(DeepSeek)": {
+      "main": [
+        [
+          {
+            "node": "Search OpenAlex",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search OpenAlex": {
+      "main": [
+        [
+          {
+            "node": "Standardize + Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Standardize + Candidates": {
+      "main": [
+        [
+          {
+            "node": "Enrich Candidates (Europe PMC)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich Candidates (Europe PMC)": {
+      "main": [
+        [
+          {
+            "node": "准备人工复核清单",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "准备人工复核清单": {
+      "main": [
+        [
+          {
+            "node": "等待人工复核",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "等待人工复核": {
+      "main": [
+        [
+          {
+            "node": "应用人工复核结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "应用人工复核结果": {
+      "main": [
+        [
+          {
+            "node": "Download & Validate PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download & Validate PDF": {
+      "main": [
+        [
+          {
+            "node": "Write PDF To papers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write PDF To papers": {
       "main": [
         [
           {
@@ -649,17 +969,22 @@
           }
         ]
       ]
+    },
+    "手动精读(papers已就绪)": {
+      "main": [
+        [
+          {
+            "node": "Read PDFs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true
   },
-  "staticData": null,
-  "activeVersionId": null,
-  "versionCounter": 6,
-  "versionMetadata": {
-    "name": null,
-    "description": null
-  }
+  "active": false
 }
