@@ -13,13 +13,9 @@
 
 <p align="center"><img src="static/input-form.png" width="520" alt="输入表单"></p>
 
-**② 报告图文并茂：原图在上、AI 分析在下**（下图为某篇分子对接综述的「图 1」被精读的效果）：
+**② 报告图文并茂：原图在上、AI 分析在下**（下图为某篇分子对接综述的「图 1」被精读的效果）；整篇最终打成 **zip 自动送达 QQ 邮箱**（含可直接用浏览器打开的自包含 HTML，完整文件同时落 `out/`）：
 
 ![报告效果](static/report-effect.png)
-
-**③ 报告打成 zip 自动送达 QQ 邮箱**（含可直接浏览器打开的自包含 HTML）：
-
-![邮件送达](static/email-report.png)
 
 ---
 
