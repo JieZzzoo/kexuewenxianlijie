@@ -19,6 +19,8 @@ services:
       - N8N_RUNNERS_ENABLED=true
       - N8N_RESTRICT_FILE_ACCESS_TO=/data # 允许读写 /data 下的 papers、out（多个目录用 ; 分隔）
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false # 允许节点表达式读取 $env（密钥从这里读）
+      - N8N_DEFAULT_BINARY_DATA_MODE=filesystem # 二进制(PDF/图/报告)落盘而非常驻内存，多篇精读防 OOM
+      - NODE_OPTIONS=--max-old-space-size=2048   # 提升堆上限作兜底
     volumes:
       - n8n_data:/home/node/.n8n         # n8n 数据（工作流、凭据、加密 key）持久化
       - ./papers:/data/papers            # 放精选 PDF 的目录（host ./papers → 容器 /data/papers）
